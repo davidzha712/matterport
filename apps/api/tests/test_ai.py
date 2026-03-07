@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 import app.settings as settings
+from app.ai.providers.minimax import MiniMaxAdapter, ProviderInvocationError
 from app.main import app
 
 client = TestClient(app)
@@ -56,6 +57,59 @@ def test_ai_task_routes_vision_detect_to_minimax_without_leaking_secret(monkeypa
     assert payload["output"]["structuredData"]["attachmentCount"] == 1
     assert payload["output"]["structuredData"]["spaceId"] == "museum-east-hall"
     assert secret not in response.text
+
+
+def test_ai_task_invokes_minimax_runtime_for_narrative_summarize(monkeypatch) -> None:
+    _clear_ai_provider_env(monkeypatch)
+    monkeypatch.setattr(settings, "_read_local_env", lambda: {"MINIMAX_API_KEY": "secret"})
+    monkeypatch.setattr(
+        MiniMaxAdapter,
+        "_invoke_text_task",
+        lambda self, task: "Kuratorische Zusammenfassung aus MiniMax.",
+    )
+
+    response = client.post(
+        "/api/v1/ai/tasks",
+        json={
+            "taskType": "narrative-summarize",
+            "input": {
+                "prompt": "Schreibe eine hochwertige Zusammenfassung dieses Raums.",
+                "spaceId": "museum-east-hall",
+                "roomId": "library",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["provider"]["providerId"] == "minimax"
+    assert payload["output"]["summary"] == "Kuratorische Zusammenfassung aus MiniMax."
+    assert payload["output"]["structuredData"]["deliveryMode"] == "openai-compatible-text"
+    assert payload["output"]["structuredData"]["model"] == "MiniMax-M1"
+
+
+def test_ai_task_returns_502_when_minimax_invocation_fails(monkeypatch) -> None:
+    _clear_ai_provider_env(monkeypatch)
+    monkeypatch.setattr(settings, "_read_local_env", lambda: {"MINIMAX_API_KEY": "secret"})
+
+    def raise_provider_error(self, task) -> str:
+        raise ProviderInvocationError("MiniMax request failed.")
+
+    monkeypatch.setattr(MiniMaxAdapter, "_invoke_text_task", raise_provider_error)
+
+    response = client.post(
+        "/api/v1/ai/tasks",
+        json={
+            "taskType": "workflow-assist",
+            "input": {
+                "prompt": "Erstelle einen sicheren Review-Ablauf fuer diesen Raum.",
+                "spaceId": "museum-east-hall",
+            },
+        },
+    )
+
+    assert response.status_code == 502
+    assert response.json() == {"detail": "MiniMax request failed."}
 
 
 def test_ai_task_returns_503_when_no_configured_provider_can_handle_request(monkeypatch) -> None:
