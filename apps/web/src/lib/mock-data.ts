@@ -51,6 +51,8 @@ export type ProjectRecord = {
   vertical: "Estate" | "Museum" | "Collection"
 }
 
+const primaryLiveModelSid = process.env.NEXT_PUBLIC_MATTERPORT_MODEL_SID ?? "oyaicKWaEQw"
+
 const projects: ProjectRecord[] = [
   {
     id: "estate-orchard",
@@ -62,7 +64,7 @@ const projects: ProjectRecord[] = [
     spaces: [
       {
         id: "orchard-main-house",
-        matterportModelSid: undefined,
+        matterportModelSid: primaryLiveModelSid,
         name: "Main House",
         projectId: "estate-orchard",
         projectName: "Orchard Estate Review",
@@ -251,4 +253,3 @@ export function getObjectById(spaceId: string, objectId: string) {
 export function getRoomById(spaceId: string, roomId: string) {
   return getSpaceById(spaceId)?.rooms.find((room) => room.id === roomId)
 }
-

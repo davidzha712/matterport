@@ -8,13 +8,12 @@ type EmbedStatus = {
 }
 
 export function getMatterportEmbedStatus(space: SpaceRecord): EmbedStatus {
-  const envModelSid = process.env.NEXT_PUBLIC_MATTERPORT_MODEL_SID
-  const modelSid = space.matterportModelSid ?? envModelSid
+  const modelSid = space.matterportModelSid
   const sdkKeyStatus = process.env.NEXT_PUBLIC_MATTERPORT_SDK_KEY ? "available" : "missing"
 
-  if (modelSid && sdkKeyStatus === "available") {
+  if (modelSid) {
     return {
-      label: "Live-ready",
+      label: sdkKeyStatus === "available" ? "SDK-ready" : "Viewer-ready",
       modelSid,
       sdkKeyStatus,
       state: "connected"
@@ -29,7 +28,7 @@ export function getMatterportEmbedStatus(space: SpaceRecord): EmbedStatus {
   }
 }
 
-export function getMatterportEmbedUrl(modelSid: string) {
+export function getMatterportEmbedUrl(modelSid: string, sdkKey?: string) {
   const search = new URLSearchParams({
     m: modelSid,
     play: "1",
@@ -40,6 +39,9 @@ export function getMatterportEmbedUrl(modelSid: string) {
     mt: "0"
   })
 
+  if (sdkKey) {
+    search.set("applicationKey", sdkKey)
+  }
+
   return `https://my.matterport.com/show/?${search.toString()}`
 }
-

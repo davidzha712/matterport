@@ -55,3 +55,13 @@ def test_provider_list_exposes_capabilities_without_secrets() -> None:
     assert provider["configured"] is False
     assert "taskClasses" in provider
     assert "apiKey" not in provider
+
+
+def test_matterport_status_masks_secret_configuration() -> None:
+    response = client.get("/api/v1/integrations/matterport/status")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["service"] == "matterport"
+    assert "tokenSecret" not in payload
+    assert "sdkKey" not in payload

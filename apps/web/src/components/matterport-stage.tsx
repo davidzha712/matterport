@@ -4,7 +4,8 @@ import { toToneToken } from "@/lib/presentation"
 
 export function MatterportStage({ space }: { space: SpaceRecord }) {
   const embed = getMatterportEmbedStatus(space)
-  const iframeSource = embed.modelSid ? getMatterportEmbedUrl(embed.modelSid) : null
+  const sdkKey = process.env.NEXT_PUBLIC_MATTERPORT_SDK_KEY
+  const iframeSource = embed.modelSid ? getMatterportEmbedUrl(embed.modelSid, sdkKey) : null
 
   return (
     <section aria-label="Immersive stage" className="stage-shell">
