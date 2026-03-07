@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { getBrowserApiBaseUrl } from "@/lib/browser-api"
 import { getRuntimeReviewQueue } from "@/lib/platform-service"
 import { toDisplayDisposition, toDisplayPriority } from "@/lib/presentation"
 import { buildObjectRoute, buildRoomRoute, buildSpaceRoute } from "@/lib/routes"
@@ -18,6 +19,13 @@ export default async function ReviewCenterPage() {
           <Link className="button button--secondary" href="/">
             Zur Uebersicht
           </Link>
+          <a 
+            className="button button--secondary" 
+            href={`${getBrowserApiBaseUrl()}/export/all/csv`}
+            download
+          >
+            Alle exportieren
+          </a>
           {items[0] ? (
             <Link className="button button--primary" href={buildSpaceRoute(items[0].spaceId, "review")}>
               Direkt in den Review-Modus

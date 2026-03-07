@@ -36,14 +36,23 @@ html {
 
 body {
   margin: 0;
+  font-size: 1rem;
   min-height: 100vh;
   overflow-x: hidden;
   color: var(--text);
-  font-family: var(--font-sans), "Avenir Next", sans-serif;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   background:
     radial-gradient(circle at top left, rgba(137, 90, 36, 0.35), transparent 22%),
     radial-gradient(circle at top right, rgba(20, 92, 111, 0.28), transparent 18%),
     linear-gradient(180deg, #071019 0%, #09131d 44%, #050c14 100%);
+}
+
+::selection {
+  background: rgba(203, 176, 110, 0.3);
+  color: var(--text);
 }
 
 a {
@@ -115,9 +124,11 @@ h1,
 h2,
 h3 {
   margin: 0;
-  font-family: var(--font-display), Georgia, serif;
+  font-family: var(--font-display);
+  font-feature-settings: "liga" 1, "kern" 1;
   font-weight: 600;
-  line-height: 1.02;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
   text-wrap: balance;
 }
 
@@ -312,7 +323,7 @@ ul {
 }
 
 .metric-card strong {
-  font-family: var(--font-display), Georgia, serif;
+  font-family: var(--font-display);
   font-size: 2rem;
   font-variant-numeric: tabular-nums;
 }
@@ -457,6 +468,27 @@ ul {
 .project-card {
   position: relative;
   overflow: hidden;
+}
+
+.export-project-card {
+  display: grid;
+  gap: 1rem;
+}
+
+.export-space-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.export-space-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .project-card__glow {
@@ -1387,7 +1419,7 @@ ul {
 }
 
 .stage-storyline strong {
-  font-family: var(--font-display), Georgia, serif;
+  font-family: var(--font-display);
   font-size: 1.1rem;
 }
 
@@ -1511,7 +1543,7 @@ ul {
 }
 
 .asset-tile strong {
-  font-family: var(--font-display), Georgia, serif;
+  font-family: var(--font-display);
   font-size: 1.15rem;
 }
 

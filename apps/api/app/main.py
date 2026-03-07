@@ -8,6 +8,7 @@ from app.routers.projects import router as projects_router
 from app.routers.providers import router as providers_router
 from app.routers.spaces import router as spaces_router
 from app.routers.workflows import router as workflows_router
+from app.routers.export import router as export_router
 
 
 def create_app() -> FastAPI:
@@ -33,6 +34,7 @@ def create_app() -> FastAPI:
     app.include_router(providers_router, prefix=api_prefix)
     app.include_router(spaces_router, prefix=api_prefix)
     app.include_router(workflows_router, prefix=api_prefix)
+    app.include_router(export_router, prefix=api_prefix)
     return app
 
 

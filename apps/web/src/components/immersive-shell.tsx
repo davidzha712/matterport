@@ -28,9 +28,9 @@ export function ImmersiveShell({
   const reduceMotion = useReducedMotion()
   const focalRoom = selectedRoom ?? space.rooms[0]
   const focalObject = selectedObject ?? space.objects[0]
-  const enterFromTop = reduceMotion ? { opacity: 1, y: 0 } : { opacity: 1, y: 0 }
-  const enterFromLeft = reduceMotion ? { opacity: 1, x: 0 } : { opacity: 1, x: 0 }
-  const enterFromBottom = reduceMotion ? { opacity: 1, y: 0 } : { opacity: 1, y: 0 }
+  const enterFromTop = { opacity: 1, y: 0 }
+  const enterFromLeft = { opacity: 1, x: 0 }
+  const enterFromBottom = { opacity: 1, y: 0 }
   const immediateTransition = { duration: reduceMotion ? 0 : 0.4, ease: [0.22, 1, 0.36, 1] as const }
 
   return (
@@ -61,6 +61,9 @@ export function ImmersiveShell({
               </li>
               <li>
                 <Link href="/review-center">Review Center</Link>
+              </li>
+              <li>
+                <Link href="/export-center">Export</Link>
               </li>
               <li>
                 <Link href={buildSpaceRoute(space.id, "review")}>Stage Review</Link>

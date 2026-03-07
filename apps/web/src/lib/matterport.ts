@@ -28,7 +28,7 @@ export function getMatterportEmbedStatus(space: SpaceRecord): EmbedStatus {
   }
 }
 
-export function getMatterportEmbedUrl(modelSid: string, sdkKey?: string) {
+export function getMatterportEmbedUrl(modelSid: string) {
   const search = new URLSearchParams({
     m: modelSid,
     play: "1",
@@ -38,10 +38,6 @@ export function getMatterportEmbedUrl(modelSid: string, sdkKey?: string) {
     help: "0",
     mt: "0"
   })
-
-  if (sdkKey) {
-    search.set("applicationKey", sdkKey)
-  }
 
   return `https://my.matterport.com/show/?${search.toString()}`
 }

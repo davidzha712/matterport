@@ -30,11 +30,10 @@ describe("Matterport helpers", () => {
     expect(status.modelSid).toBeUndefined()
   })
 
-  it("adds the application key to the showcase url when available", () => {
-    const url = getMatterportEmbedUrl("oyaicKWaEQw", "sdk-demo-key")
+  it("keeps the public showcase url free of SDK-only query params", () => {
+    const url = getMatterportEmbedUrl("oyaicKWaEQw")
 
     expect(url).toContain("m=oyaicKWaEQw")
-    expect(url).toContain("applicationKey=sdk-demo-key")
+    expect(url).not.toContain("applicationKey=")
   })
 })
-

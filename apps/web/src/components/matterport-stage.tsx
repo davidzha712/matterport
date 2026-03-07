@@ -10,8 +10,7 @@ export function MatterportStage({
   space: SpaceRecord
 }) {
   const embed = getMatterportEmbedStatus(space)
-  const sdkKey = process.env.NEXT_PUBLIC_MATTERPORT_SDK_KEY
-  const iframeSource = embed.modelSid ? getMatterportEmbedUrl(embed.modelSid, sdkKey) : null
+  const iframeSource = embed.modelSid ? getMatterportEmbedUrl(embed.modelSid) : null
 
   return (
     <section aria-label="Immersive Stage" className="stage-shell">
