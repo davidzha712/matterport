@@ -1,0 +1,26 @@
+[project]
+name = "matterport-platform-api"
+version = "0.1.0"
+description = "FastAPI scaffold for a multi-project immersive Matterport platform."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115.11",
+  "pydantic>=2.10.6",
+  "uvicorn[standard]>=0.34.0",
+]
+
+[dependency-groups]
+dev = [
+  "httpx>=0.28.1",
+  "pytest>=8.3.5",
+  "pytest-asyncio>=0.25.3",
+]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.uv]
+package = true
+

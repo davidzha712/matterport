@@ -1,0 +1,16 @@
+{
+  "name": "matterport-platform",
+  "private": true,
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev:web": "npm --workspace @matterport/web run dev",
+    "build:web": "npm --workspace @matterport/web run build",
+    "lint:web": "npm --workspace @matterport/web run lint",
+    "typecheck:web": "npm --workspace @matterport/web run typecheck",
+    "test:web": "npm --workspace @matterport/web run test",
+    "test:e2e:web": "npm --workspace @matterport/web run test:e2e"
+  }
+}
+
