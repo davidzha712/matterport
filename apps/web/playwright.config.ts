@@ -7,6 +7,7 @@ export default defineConfig({
     navigationTimeout: 30000
   },
   webServer: {
+    cwd: __dirname,
     command: "npm run start -- --port 3000",
     port: 3000,
     reuseExistingServer: false

@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:e2e": "next dev",
-    "build": "rm -rf .next && next build",
+    "build": "next build",
     "start": "next start",
     "lint": "eslint src tests e2e *.ts *.mjs --max-warnings=0 --no-warn-ignored",
     "typecheck": "next typegen && tsc --noEmit",
