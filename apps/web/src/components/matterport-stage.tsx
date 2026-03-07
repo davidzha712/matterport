@@ -1,6 +1,5 @@
 import type { SpaceRecord } from "@/lib/mock-data"
 import { getMatterportEmbedStatus, getMatterportEmbedUrl } from "@/lib/matterport"
-import { toToneToken } from "@/lib/presentation"
 import type { ReactNode } from "react"
 
 export function MatterportStage({
@@ -13,19 +12,15 @@ export function MatterportStage({
   const embed = getMatterportEmbedStatus(space)
   const sdkKey = process.env.NEXT_PUBLIC_MATTERPORT_SDK_KEY
   const iframeSource = embed.modelSid ? getMatterportEmbedUrl(embed.modelSid, sdkKey) : null
-  const stageSignals = [
-    `Projekt: ${space.projectName}`,
-    embed.state === "connected" ? "Matterport live" : "Design mode",
-    `${space.rooms.length} Raeume / ${space.objects.length} Objekte`
-  ]
 
   return (
     <section aria-label="Immersive Stage" className="stage-shell">
       {embed.state === "connected" && iframeSource ? (
         <iframe
-          allow="fullscreen; xr-spatial-tracking"
+          allow="fullscreen; xr-spatial-tracking; accelerometer; gyroscope"
           className="stage-iframe"
           loading="eager"
+          referrerPolicy="strict-origin-when-cross-origin"
           src={iframeSource}
           title={`${space.name} Matterport stage`}
         />
@@ -49,21 +44,6 @@ export function MatterportStage({
       <div className="stage-grid" aria-hidden="true" />
       <div className="stage-atmosphere" aria-hidden="true" />
       <div className="stage-vignette" aria-hidden="true" />
-      <div className="stage-meta">
-        <p className="eyebrow">Matterport Stage</p>
-        <div className="stage-meta__row">
-          <h2>{space.name}</h2>
-          <span className={`pill pill--${toToneToken(embed.state)}`}>{embed.label}</span>
-        </div>
-        <p className="stage-meta__copy">
-          {space.summary}
-        </p>
-        <ul className="stage-signal-strip">
-          {stageSignals.map((signal) => (
-            <li key={signal}>{signal}</li>
-          ))}
-        </ul>
-      </div>
       {children}
     </section>
   )

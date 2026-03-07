@@ -27,6 +27,12 @@ const verticalLabels: Record<string, string> = {
   Museum: "Museum"
 }
 
+const priorityLabels: Record<string, string> = {
+  High: "Hoch",
+  Low: "Niedrig",
+  Medium: "Mittel"
+}
+
 export function toDisplayWorkflowStatus(value: string) {
   return workflowStatusLabels[value] ?? value
 }
@@ -41,4 +47,8 @@ export function toDisplayDisposition(value: string) {
 
 export function toDisplayVertical(value: string) {
   return verticalLabels[value] ?? value
+}
+
+export function toDisplayPriority(value: string) {
+  return priorityLabels[value] ?? value
 }

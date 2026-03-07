@@ -6,7 +6,7 @@ test("home page exposes the multi-project immersive platform entry points", asyn
   await page.goto("/");
 
   await expect(page.getByRole("main")).toBeVisible();
-  await expect(page.locator("h1")).toContainText(/Raeumliche Intelligenz/i);
+  await expect(page.locator("h1")).toContainText(/Immersive Wissensraeume/i);
   await expect(page.locator("main")).toContainText(/Matterport wird zur Buehne/i);
   await expect(page.getByRole("link", { name: /live-space betreten/i })).toBeVisible();
 });

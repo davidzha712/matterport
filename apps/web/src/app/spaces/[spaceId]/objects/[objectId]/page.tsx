@@ -20,12 +20,17 @@ export default async function ObjectDetailPage({ params }: ObjectDetailPageProps
     notFound()
   }
 
+  const relatedObjects = space.objects
+    .filter((candidate) => candidate.roomId === objectRecord.roomId && candidate.id !== objectRecord.id)
+    .slice(0, 3)
+
   return (
     <main className="detail-shell" id="main-content">
       <header className="detail-header">
         <div>
           <p className="eyebrow">Objektdossier</p>
           <h1>{objectRecord.title}</h1>
+          <p>{space.projectName} · {objectRecord.roomName}</p>
         </div>
         <div className="detail-header__actions">
           <Link className="button button--secondary" href={buildRoomRoute(spaceId, objectRecord.roomId)}>
@@ -41,11 +46,28 @@ export default async function ObjectDetailPage({ params }: ObjectDetailPageProps
         <article className="detail-viewport">
           <div className="detail-viewport__frame">
             <p className="eyebrow">Detail Layer</p>
-            <h2>IIIF und Deep Zoom folgen als naechster professioneller Layer.</h2>
+            <h2>Hochaufgeloeste Inspektion und Annotation werden hier verankert.</h2>
             <p>
               Diese Ansicht reserviert bereits die Flaeche fuer hochaufgeloeste Objektbilder,
               Annotationen, Vergleichsansichten und spaetere regionenbasierte KI-Analysen.
             </p>
+            <div className="asset-strip" aria-label="Objektmodule">
+              <article className="asset-tile">
+                <span>Zoom</span>
+                <strong>Deep Zoom</strong>
+                <p>IIIF-kompatible Detailansicht fuer Materialien, Kanten und Signaturen.</p>
+              </article>
+              <article className="asset-tile">
+                <span>Annotation</span>
+                <strong>Layered Notes</strong>
+                <p>Kuratorische, familiaere und workflowbezogene Anmerkungen nebeneinander.</p>
+              </article>
+              <article className="asset-tile">
+                <span>Analyse</span>
+                <strong>Region KI</strong>
+                <p>Ausgewaehlte Bereiche lassen sich spaeter separat an multimodale Modelle senden.</p>
+              </article>
+            </div>
           </div>
         </article>
 
@@ -75,6 +97,21 @@ export default async function ObjectDetailPage({ params }: ObjectDetailPageProps
             <p className="eyebrow">KI-Zusammenfassung</p>
             <p>{objectRecord.aiSummary}</p>
           </section>
+          {relatedObjects.length ? (
+            <section className="context-card">
+              <p className="eyebrow">Verwandte Objekte im Raum</p>
+              <ul className="detail-link-list">
+                {relatedObjects.map((relatedObject) => (
+                  <li key={relatedObject.id}>
+                    <Link href={`${buildSpaceRoute(spaceId)}/objects/${relatedObject.id}`}>
+                      <strong>{relatedObject.title}</strong>
+                      <span>{relatedObject.type}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
           <section className="context-card">
             <p className="eyebrow">Audit-Hinweis</p>
             <ul className="context-list">

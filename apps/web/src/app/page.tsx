@@ -22,10 +22,9 @@ export default async function HomePage() {
         <div className="hero-panel__veil" aria-hidden="true" />
         <div className="hero-copy">
           <p className="eyebrow">Primaersprache Deutsch, Englisch folgt</p>
-          <h1>Raeumliche Intelligenz fuer immersive Haeuser und Sammlungen.</h1>
+          <h1>Immersive Wissensraeume fuer Nachlaesse und Sammlungen.</h1>
           <h2 className="hero-copy__headline">
-            Matterport wird zur Buehne. Objektwissen, KI-Orchestrierung und Review-Logik liegen
-            direkt darueber.
+            Matterport wird zur Buehne, KI zur Wissens- und Workflow-Schicht.
           </h2>
           <p className="hero-copy__body">
             Das hier ist keine gewoehnliche Projektseite. Es ist eine wiederverwendbare immersive

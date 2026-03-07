@@ -58,9 +58,9 @@ export function ImmersiveShell({
                 <Link href="/settings/providers">Provider</Link>
               </li>
               <li>
-                <Link href={buildSpaceRoute(space.id, "review")}>Prüfzentrum</Link>
+                <Link href={buildSpaceRoute(space.id, "review")}>Pruefzentrum</Link>
               </li>
-              <li className="inline-nav__locale">DE / EN</li>
+              <li className="inline-nav__locale">DE zuerst · EN folgt</li>
             </ul>
           </nav>
         </motion.header>

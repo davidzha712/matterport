@@ -156,32 +156,26 @@ export function CommandBar({ room, space }: CommandBarProps) {
         <input
           autoComplete="off"
           aria-describedby="command-bar-help"
+          enterKeyHint="go"
           id="command-bar-input"
           name="command"
           onChange={(event) => setCommand(event.target.value)}
+          placeholder="Zum Beispiel: Zeige mir alle priorisierten Objekte im Salon…"
+          spellCheck={false}
           type="text"
           value={command}
         />
 
         <div className="command-bar__footer">
-          <div className="command-bar__chips" id="command-bar-help">
-            {quickActions.map((action) => (
-              <button
-                className="command-chip"
-                key={action.label}
-                onClick={() => applyQuickAction(action)}
-                type="button"
-              >
-                {action.label}
-              </button>
-            ))}
-          </div>
+          <span className="command-bar__help" id="command-bar-help">
+            Aufgabe waehlen, Prompt verfeinern, dann Analyse starten.
+          </span>
           <button
             className="button button--primary command-bar__submit"
             disabled={isSubmitting || isPending}
             type="submit"
           >
-            {isSubmitting || isPending ? "Analysiere..." : "Analyse starten"}
+            {isSubmitting || isPending ? "Analysiere…" : "Analyse starten"}
           </button>
         </div>
       </form>
@@ -190,35 +184,37 @@ export function CommandBar({ room, space }: CommandBarProps) {
         Vorschau: <span>{deferredCommand}</span>
       </p>
 
-      <div className="command-brief" aria-live="polite">
-        <div className="command-brief__header">
-          <strong>Routenstatus</strong>
-          <span>{result?.provider.providerId ?? "MiniMax bevorzugt"}</span>
-        </div>
-        {error ? <p className="command-brief__error">{error}</p> : null}
-        {result ? (
-          <>
-            <p>{result.output.summary}</p>
-            <ul className="command-brief__facts">
-              <li>Provider: {result.provider.providerId}</li>
-              <li>Konfiguriert: {result.provider.configured ? "Ja" : "Nein"}</li>
-              <li>Task: {result.taskType}</li>
-            </ul>
-            {result.output.warnings.length ? (
-              <ul className="command-brief__warnings">
-                {result.output.warnings.map((warning) => (
-                  <li key={warning}>{warning}</li>
-                ))}
+      {result || error ? (
+        <div className="command-brief" aria-live="polite">
+          <div className="command-brief__header">
+            <strong>Routenstatus</strong>
+            <span>{result?.provider.providerId ?? "MiniMax bevorzugt"}</span>
+          </div>
+          {error ? <p className="command-brief__error">{error}</p> : null}
+          {result ? (
+            <>
+              <p>{result.output.summary}</p>
+              <ul className="command-brief__facts">
+                <li>Provider: {result.provider.providerId}</li>
+                <li>Konfiguriert: {result.provider.configured ? "Ja" : "Nein"}</li>
+                <li>Task: {result.taskType}</li>
               </ul>
-            ) : null}
-          </>
-        ) : (
-          <p>
-            Schluessel bleiben serverseitig. Diese Konsole ruft nur den orchestrierten Backend-Endpunkt
-            auf und zeigt dessen review-first Ergebnis an.
-          </p>
-        )}
-      </div>
+              {result.output.warnings.length ? (
+                <ul className="command-brief__warnings">
+                  {result.output.warnings.map((warning) => (
+                    <li key={warning}>{warning}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </>
+          ) : null}
+        </div>
+      ) : (
+        <p className="command-note">
+          Schluessel bleiben serverseitig. Die Konsole startet nur orchestrierte, pruefbare
+          Analysejobs.
+        </p>
+      )}
     </section>
   )
 }
