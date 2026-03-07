@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 import { ImmersiveShell } from "@/components/immersive-shell"
-import { getSpaceById } from "@/lib/mock-data"
+import { getRuntimeSpace } from "@/lib/platform-service"
+import { getRuntimeProviderProfiles } from "@/lib/provider-service"
 import { isStageMode, type StageMode } from "@/lib/routes"
 
 type SpaceModePageProps = {
@@ -10,6 +11,8 @@ type SpaceModePageProps = {
   }>
 }
 
+export const dynamic = "force-dynamic"
+
 export default async function SpaceModePage({ params }: SpaceModePageProps) {
   const { mode, spaceId } = await params
 
@@ -17,16 +20,14 @@ export default async function SpaceModePage({ params }: SpaceModePageProps) {
     notFound()
   }
 
-  const space = getSpaceById(spaceId)
+  const [space, providers] = await Promise.all([
+    getRuntimeSpace(spaceId),
+    getRuntimeProviderProfiles()
+  ])
 
   if (!space) {
     notFound()
   }
 
-  return <ImmersiveShell focusMode={mode as StageMode} space={space} />
+  return <ImmersiveShell focusMode={mode as StageMode} providers={providers} space={space} />
 }
-
-export function generateStaticParams() {
-  return []
-}
-

@@ -6,12 +6,13 @@ import { CommandBar } from "@/components/command-bar"
 import { ContextPanel } from "@/components/context-panel"
 import { MatterportStage } from "@/components/matterport-stage"
 import { ModeRail } from "@/components/mode-rail"
-import type { ObjectRecord, RoomRecord, SpaceRecord } from "@/lib/mock-data"
+import type { ObjectRecord, ProviderProfile, RoomRecord, SpaceRecord } from "@/lib/mock-data"
 import { buildSpaceRoute } from "@/lib/routes"
 import { stageModeLabels, type StageMode } from "@/lib/routes"
 
 type ImmersiveShellProps = {
   focusMode: StageMode
+  providers: ProviderProfile[]
   selectedObject?: ObjectRecord
   selectedRoom?: RoomRecord
   space: SpaceRecord
@@ -19,6 +20,7 @@ type ImmersiveShellProps = {
 
 export function ImmersiveShell({
   focusMode,
+  providers,
   selectedObject,
   selectedRoom,
   space
@@ -58,7 +60,10 @@ export function ImmersiveShell({
                 <Link href="/settings/providers">Provider</Link>
               </li>
               <li>
-                <Link href={buildSpaceRoute(space.id, "review")}>Pruefzentrum</Link>
+                <Link href="/review-center">Review Center</Link>
+              </li>
+              <li>
+                <Link href={buildSpaceRoute(space.id, "review")}>Stage Review</Link>
               </li>
               <li className="inline-nav__locale">DE zuerst · EN folgt</li>
             </ul>
@@ -102,7 +107,12 @@ export function ImmersiveShell({
           initial={reduceMotion ? false : { opacity: 0, x: 28 }}
           transition={{ ...immediateTransition, delay: reduceMotion ? 0 : 0.12 }}
         >
-          <ContextPanel selectedObject={selectedObject} selectedRoom={selectedRoom} space={space} />
+          <ContextPanel
+            providers={providers}
+            selectedObject={selectedObject}
+            selectedRoom={selectedRoom}
+            space={space}
+          />
         </motion.aside>
 
         <motion.section

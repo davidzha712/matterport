@@ -1,13 +1,16 @@
 import Link from "next/link"
 import { ProjectOverviewCard } from "@/components/project-overview-card"
-import { getProjects } from "@/lib/mock-data"
+import { getRuntimeProjects, getRuntimeReviewQueue } from "@/lib/platform-service"
 import { getRuntimeProviderProfiles } from "@/lib/provider-service"
-import { toDisplayWorkflowStatus, toToneToken } from "@/lib/presentation"
-import { buildSpaceRoute } from "@/lib/routes"
+import { toDisplayDisposition, toDisplayPriority, toDisplayWorkflowStatus, toToneToken } from "@/lib/presentation"
+import { buildObjectRoute, buildSpaceRoute } from "@/lib/routes"
 
 export default async function HomePage() {
-  const projects = getProjects()
-  const providers = await getRuntimeProviderProfiles()
+  const [projects, providers, reviewQueue] = await Promise.all([
+    getRuntimeProjects(),
+    getRuntimeProviderProfiles(),
+    getRuntimeReviewQueue()
+  ])
   const featuredSpace = projects[0]?.spaces[0]
   const totalSpaces = projects.reduce((total, project) => total + project.spaces.length, 0)
   const totalObjects = projects.reduce(
@@ -37,6 +40,9 @@ export default async function HomePage() {
                 Live-Space betreten
               </Link>
             ) : null}
+            <Link className="button button--secondary" href="/review-center">
+              Review Center
+            </Link>
             <Link className="button button--secondary" href="/settings/providers">
               Provider-Konfiguration pruefen
             </Link>
@@ -70,8 +76,8 @@ export default async function HomePage() {
               <strong>{totalSpaces}</strong>
             </div>
             <div className="metric-card">
-              <span>Provider</span>
-              <strong>{providers.length}</strong>
+              <span>Review Queue</span>
+              <strong>{reviewQueue.length}</strong>
             </div>
             <div className="metric-card metric-card--wide">
               <span>Objekte</span>
@@ -130,6 +136,33 @@ export default async function HomePage() {
 
         <aside className="section-card section-card--narrow">
           <div className="section-heading">
+            <div>
+              <p className="eyebrow">Review Center</p>
+              <h2>Offene Entscheidungen</h2>
+            </div>
+            <p>Menschen pruefen, Modelle beschleunigen. Diese Liste kommt jetzt aus dem Backend.</p>
+          </div>
+          <ul className="review-queue-list" aria-label="Pending review items">
+            {reviewQueue.slice(0, 4).map((item) => (
+              <li key={item.objectId}>
+                <Link href={buildObjectRoute(item.spaceId, item.objectId)}>
+                  <div>
+                    <strong>{item.objectTitle}</strong>
+                    <p>
+                      {item.projectName} · {item.spaceName} · {item.roomName}
+                    </p>
+                  </div>
+                  <div className="review-queue-list__meta">
+                    <span className="pill pill--needs-review">{toDisplayWorkflowStatus(item.status)}</span>
+                    <small>
+                      {toDisplayPriority(item.priorityBand)} · {toDisplayDisposition(item.disposition)}
+                    </small>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <div className="section-heading section-heading--compact">
             <div>
               <p className="eyebrow">Routing</p>
               <h2>Modellpolitik</h2>

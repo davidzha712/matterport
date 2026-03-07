@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { getObjectById, getSpaceById } from "@/lib/mock-data"
+import { getRuntimeObject } from "@/lib/platform-service"
 import { toDisplayDisposition, toDisplayObjectStatus } from "@/lib/presentation"
 import { buildRoomRoute, buildSpaceRoute } from "@/lib/routes"
 
@@ -13,8 +13,7 @@ type ObjectDetailPageProps = {
 
 export default async function ObjectDetailPage({ params }: ObjectDetailPageProps) {
   const { objectId, spaceId } = await params
-  const space = getSpaceById(spaceId)
-  const objectRecord = getObjectById(spaceId, objectId)
+  const { objectRecord, space } = await getRuntimeObject(spaceId, objectId)
 
   if (!space || !objectRecord) {
     notFound()

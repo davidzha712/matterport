@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { getRoomById, getSpaceById } from "@/lib/mock-data"
+import { getRuntimeRoom } from "@/lib/platform-service"
 import { buildObjectRoute, buildSpaceRoute } from "@/lib/routes"
 
 type RoomDetailPageProps = {
@@ -12,8 +12,7 @@ type RoomDetailPageProps = {
 
 export default async function RoomDetailPage({ params }: RoomDetailPageProps) {
   const { roomId, spaceId } = await params
-  const space = getSpaceById(spaceId)
-  const room = getRoomById(spaceId, roomId)
+  const { room, space } = await getRuntimeRoom(spaceId, roomId)
 
   if (!space || !room) {
     notFound()

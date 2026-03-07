@@ -52,6 +52,20 @@ export type ProjectRecord = {
   vertical: "Estate" | "Museum" | "Collection"
 }
 
+export type ReviewQueueItem = {
+  disposition: ObjectRecord["disposition"]
+  objectId: string
+  objectTitle: string
+  priorityBand: RoomRecord["priorityBand"]
+  projectId: string
+  projectName: string
+  roomId: string
+  roomName: string
+  spaceId: string
+  spaceName: string
+  status: ObjectStatus
+}
+
 const primaryLiveModelSid = process.env.NEXT_PUBLIC_MATTERPORT_MODEL_SID ?? "oyaicKWaEQw"
 const providerEnv = {
   kimi: Boolean(process.env.KIMI_API_KEY),
@@ -251,6 +265,32 @@ export function getProjectBySpaceId(spaceId: string) {
 
 export function getProviderProfiles() {
   return providers
+}
+
+export function getReviewQueue(): ReviewQueueItem[] {
+  return projects.flatMap((project) =>
+    project.spaces.flatMap((space) =>
+      space.objects
+        .filter((objectRecord) => objectRecord.status === "Needs Review")
+        .map((objectRecord) => {
+          const room = space.rooms.find((candidate) => candidate.id === objectRecord.roomId)
+
+          return {
+            disposition: objectRecord.disposition,
+            objectId: objectRecord.id,
+            objectTitle: objectRecord.title,
+            priorityBand: room?.priorityBand ?? "Medium",
+            projectId: project.id,
+            projectName: project.name,
+            roomId: objectRecord.roomId,
+            roomName: objectRecord.roomName,
+            spaceId: space.id,
+            spaceName: space.name,
+            status: objectRecord.status,
+          }
+        })
+    )
+  )
 }
 
 export function getSpaceById(spaceId: string) {

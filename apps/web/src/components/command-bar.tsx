@@ -2,6 +2,7 @@
 
 import type { FormEvent } from "react"
 import { useDeferredValue, useState, useTransition } from "react"
+import { getBrowserApiBaseUrl } from "@/lib/browser-api"
 import type { RoomRecord, SpaceRecord } from "@/lib/mock-data"
 
 type TaskType = "vision-detect" | "narrative-summarize" | "workflow-assist"
@@ -49,10 +50,6 @@ const quickActions: QuickAction[] = [
   }
 ]
 
-function getApiBaseUrl() {
-  return process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000/api/v1"
-}
-
 export function CommandBar({ room, space }: CommandBarProps) {
   const [taskType, setTaskType] = useState<TaskType>("vision-detect")
   const [command, setCommand] = useState(
@@ -76,7 +73,7 @@ export function CommandBar({ room, space }: CommandBarProps) {
 
     void (async () => {
       try {
-        const response = await fetch(`${getApiBaseUrl()}/ai/tasks`, {
+        const response = await fetch(`${getBrowserApiBaseUrl()}/ai/tasks`, {
           body: JSON.stringify({
             input: {
               context: {

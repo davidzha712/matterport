@@ -1,7 +1,17 @@
 from fastapi import APIRouter, HTTPException
 
-from app.models import ProjectListResponse, ProjectSummary, SpaceListResponse
-from app.repository import get_project, list_projects, list_spaces
+from app.models import (
+    ProjectCatalogResponse,
+    ProjectListResponse,
+    ProjectSummary,
+    SpaceListResponse,
+)
+from app.repository import (
+    get_project,
+    list_project_records,
+    list_projects,
+    list_spaces,
+)
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -9,6 +19,11 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 @router.get("", response_model=ProjectListResponse)
 def get_projects() -> ProjectListResponse:
     return ProjectListResponse(items=list(list_projects()))
+
+
+@router.get("/catalog", response_model=ProjectCatalogResponse)
+def get_project_catalog() -> ProjectCatalogResponse:
+    return ProjectCatalogResponse(items=list(list_project_records()))
 
 
 @router.get("/{project_id}", response_model=ProjectSummary)
@@ -25,4 +40,3 @@ def get_project_spaces(project_id: str) -> SpaceListResponse:
     if spaces is None:
         raise HTTPException(status_code=404, detail="Project not found")
     return SpaceListResponse(items=list(spaces))
-

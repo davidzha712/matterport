@@ -1,4 +1,14 @@
+@import "@fontsource/dm-sans/400.css";
+@import "@fontsource/dm-sans/500.css";
+@import "@fontsource/dm-sans/700.css";
+@import "@fontsource/cormorant-garamond/400.css";
+@import "@fontsource/cormorant-garamond/500.css";
+@import "@fontsource/cormorant-garamond/600.css";
+@import "@fontsource/cormorant-garamond/700.css";
+
 :root {
+  --font-display: "Cormorant Garamond", "Baskerville", "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  --font-sans: "DM Sans", "Avenir Next", "Neue Haas Grotesk Text Pro", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   --bg: #08111a;
   --bg-elevated: rgba(11, 22, 31, 0.84);
   --bg-soft: rgba(19, 34, 47, 0.72);
@@ -401,6 +411,10 @@ ul {
   margin-bottom: 1.2rem;
 }
 
+.section-heading--compact {
+  margin-top: 1.4rem;
+}
+
 .section-heading h2,
 .section-heading h1 {
   font-size: clamp(1.7rem, 3vw, 2.8rem);
@@ -489,6 +503,47 @@ ul {
   padding: 0;
 }
 
+.review-queue-list {
+  display: grid;
+  gap: 0.8rem;
+  list-style: none;
+  padding: 0;
+}
+
+.review-queue-list li {
+  min-width: 0;
+}
+
+.review-queue-list a {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  min-width: 0;
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.review-queue-list a:hover,
+.review-queue-list a:focus-visible {
+  border-color: rgba(238, 208, 138, 0.3);
+  background: rgba(19, 34, 47, 0.86);
+}
+
+.review-queue-list p {
+  margin-top: 0.2rem;
+  font-size: 0.92rem;
+}
+
+.review-queue-list__meta {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: end;
+  text-align: right;
+}
+
 .provider-list__item {
   display: flex;
   justify-content: space-between;
@@ -533,9 +588,20 @@ ul {
 
 .pill--pilot,
 .pill--needs-review,
-.pill--standby {
+.pill--standby,
+.pill--medium {
   background: rgba(240, 193, 111, 0.14);
   color: var(--warning);
+}
+
+.pill--high {
+  background: rgba(216, 142, 142, 0.14);
+  color: var(--danger);
+}
+
+.pill--low {
+  background: rgba(111, 202, 155, 0.14);
+  color: var(--success);
 }
 
 .immersive-shell {
@@ -1091,6 +1157,16 @@ ul {
   text-align: left;
 }
 
+.action-matrix__button:hover,
+.action-matrix__button:focus-visible {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.action-matrix__button:disabled {
+  opacity: 0.72;
+  cursor: progress;
+}
+
 .action-matrix__button--keep {
   border-color: rgba(111, 202, 155, 0.25);
 }
@@ -1105,6 +1181,59 @@ ul {
 
 .action-matrix__button--archive {
   border-color: rgba(216, 142, 142, 0.25);
+}
+
+.workflow-note {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.workflow-note input {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(3, 7, 11, 0.72);
+  color: var(--text);
+  padding: 0.85rem 0.95rem;
+}
+
+.workflow-feedback {
+  color: var(--success);
+  font-size: 0.92rem;
+}
+
+.workflow-feedback--error {
+  color: #f1b3b3;
+}
+
+.workflow-list {
+  display: grid;
+  gap: 0.7rem;
+  list-style: none;
+  padding: 0;
+}
+
+.workflow-list__item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.workflow-list__item p,
+.workflow-list__item small {
+  color: var(--text-muted);
+}
+
+.workflow-list__meta {
+  display: grid;
+  gap: 0.2rem;
+  justify-items: end;
+  text-align: right;
 }
 
 .context-list {
@@ -1367,6 +1496,57 @@ ul {
   margin: 0.2rem 0 0;
 }
 
+.review-center-shell {
+  display: grid;
+  gap: 1.1rem;
+}
+
+.review-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.review-card {
+  display: grid;
+  gap: 1rem;
+  padding: 1.1rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(circle at top left, rgba(238, 208, 138, 0.12), transparent 24%),
+    linear-gradient(145deg, rgba(16, 29, 39, 0.9), rgba(8, 13, 19, 0.9));
+}
+
+.review-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.review-card__meta {
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+}
+
+.review-card__meta dt {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.review-card__meta dd {
+  margin: 0.18rem 0 0;
+}
+
+.review-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
 @media (max-width: 1080px) {
   .hero-panel,
   .section-grid,
@@ -1430,7 +1610,8 @@ ul {
   .project-card__facts,
   .provider-card__facts,
   .asset-strip,
-  .detail-grid__meta {
+  .detail-grid__meta,
+  .review-card__meta {
     grid-template-columns: 1fr;
   }
 
@@ -1439,7 +1620,8 @@ ul {
   .provider-list__item,
   .command-bar__footer,
   .command-brief__header,
-  .detail-header {
+  .detail-header,
+  .review-queue-list a {
     flex-direction: column;
   }
 
@@ -1510,6 +1692,11 @@ ul {
     justify-items: start;
   }
 
+  .review-queue-list__meta {
+    justify-items: start;
+    text-align: left;
+  }
+
   .context-meta-grid,
   .action-matrix,
   .stage-highlight-rail {
@@ -1522,6 +1709,15 @@ ul {
   }
 
   .detail-link-list span {
+    text-align: left;
+  }
+
+  .workflow-list__item {
+    flex-direction: column;
+  }
+
+  .workflow-list__meta {
+    justify-items: start;
     text-align: left;
   }
 }
