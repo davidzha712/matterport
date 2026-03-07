@@ -206,8 +206,8 @@ ul {
 }
 
 .hero-copy h1 {
-  max-width: 14ch;
-  font-size: clamp(3rem, 5.8vw, 6.1rem);
+  max-width: 12ch;
+  font-size: clamp(2.6rem, 4.9vw, 5rem);
 }
 
 .hero-copy__body {
@@ -217,7 +217,7 @@ ul {
 
 .hero-copy__headline {
   max-width: 14ch;
-  font-size: clamp(1.8rem, 3.5vw, 3.4rem);
+  font-size: clamp(1.5rem, 2.6vw, 2.6rem);
   line-height: 0.98;
 }
 
@@ -1401,13 +1401,13 @@ ul {
   }
 
   .stage-command-cluster {
-    top: 5.8rem;
+    top: 5.2rem;
   }
 
   .stage-context-slot {
     top: auto;
-    bottom: calc(8.2rem + env(safe-area-inset-bottom));
-    max-height: 44vh;
+    bottom: calc(7.4rem + env(safe-area-inset-bottom));
+    max-height: 36vh;
   }
 
   .context-panel {
@@ -1420,13 +1420,25 @@ ul {
   }
 
   .stage-room-strip {
-    bottom: calc(18.9rem + env(safe-area-inset-bottom));
+    bottom: calc(15.8rem + env(safe-area-inset-bottom));
   }
 
   .stage-bottom-chrome {
     flex-direction: column;
     align-items: stretch;
     inset: auto 0.85rem calc(0.85rem + env(safe-area-inset-bottom)) 0.85rem;
+  }
+
+  .stage-meta {
+    display: none;
+  }
+
+  .stage-intro-card {
+    padding: 0.95rem 1rem;
+  }
+
+  .stage-intro-card > p {
+    display: none;
   }
 
   .stage-storyline,
