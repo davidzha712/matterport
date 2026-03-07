@@ -15,9 +15,11 @@ class AIProviderSettings(BaseModel):
     qwen_api_key: str | None = None
     kimi_api_key: str | None = None
     minimax_api_key: str | None = None
+    minimax_api_host: str = "https://api.minimax.io"
     minimax_api_base_url: str = "https://api.minimaxi.chat/v1"
     minimax_text_model: str = "MiniMax-M1"
     minimax_timeout_seconds: float = 30.0
+    minimax_vision_timeout_seconds: float = 45.0
 
 
 def _read_local_env() -> dict[str, str]:
@@ -56,6 +58,11 @@ def get_ai_provider_settings() -> AIProviderSettings:
         qwen_api_key=os.getenv("QWEN_API_KEY") or local_env.get("QWEN_API_KEY"),
         kimi_api_key=os.getenv("KIMI_API_KEY") or local_env.get("KIMI_API_KEY"),
         minimax_api_key=os.getenv("MINIMAX_API_KEY") or local_env.get("MINIMAX_API_KEY"),
+        minimax_api_host=(
+            os.getenv("MINIMAX_API_HOST")
+            or local_env.get("MINIMAX_API_HOST")
+            or "https://api.minimax.io"
+        ),
         minimax_api_base_url=(
             os.getenv("MINIMAX_API_BASE_URL")
             or local_env.get("MINIMAX_API_BASE_URL")
@@ -70,5 +77,12 @@ def get_ai_provider_settings() -> AIProviderSettings:
             os.getenv("MINIMAX_TIMEOUT_SECONDS")
             or local_env.get("MINIMAX_TIMEOUT_SECONDS")
             or 30.0
+        ),
+        minimax_vision_timeout_seconds=float(
+            os.getenv("MINIMAX_VISION_TIMEOUT_SECONDS")
+            or local_env.get("MINIMAX_VISION_TIMEOUT_SECONDS")
+            or os.getenv("MINIMAX_TIMEOUT_SECONDS")
+            or local_env.get("MINIMAX_TIMEOUT_SECONDS")
+            or 45.0
         ),
     )

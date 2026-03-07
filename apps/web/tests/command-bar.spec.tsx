@@ -41,6 +41,10 @@ describe("CommandBar", () => {
 
     render(<CommandBar room={testSpace?.rooms[0]} space={testSpace!} />)
 
+    await user.type(
+      screen.getByLabelText(/bild-url/i),
+      "https://example.com/capture.jpg"
+    )
     await user.click(screen.getByRole("button", { name: /analyse starten/i }))
 
     await waitFor(() => {
@@ -49,6 +53,23 @@ describe("CommandBar", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(fetchMock.mock.calls[0]?.[0]).toMatch(/\/ai\/tasks$/)
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      method: "POST"
+    })
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toMatchObject({
+      input: {
+        attachments: [
+          {
+            kind: "image",
+            url: "https://example.com/capture.jpg"
+          }
+        ],
+        projectId: "estate-orchard",
+        roomId: "living-room",
+        spaceId: "orchard-main-house"
+      },
+      taskType: "vision-detect"
+    })
   })
 
   it("shows a useful error state when the backend is unavailable", async () => {
@@ -64,10 +85,20 @@ describe("CommandBar", () => {
 
     render(<CommandBar room={testSpace?.rooms[0]} space={testSpace!} />)
 
+    await user.click(screen.getByRole("tab", { name: /raum erzaehlen/i }))
     await user.click(screen.getByRole("button", { name: /analyse starten/i }))
 
     await waitFor(() => {
       expect(screen.getByText(/no configured ai provider is available/i)).toBeInTheDocument()
     })
+  })
+
+  it("keeps vision submit disabled until an image is attached", () => {
+    render(<CommandBar room={testSpace?.rooms[0]} space={testSpace!} />)
+
+    expect(screen.getByRole("button", { name: /analyse starten/i })).toBeDisabled()
+    expect(
+      screen.getByText(/fuer die visuelle analyse wird mindestens ein bild benoetigt/i)
+    ).toBeInTheDocument()
   })
 })

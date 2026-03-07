@@ -1,0 +1,2 @@
+class TaskInputValidationError(RuntimeError):
+    pass

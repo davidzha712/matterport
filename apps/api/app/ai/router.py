@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.ai.errors import TaskInputValidationError
 from app.ai.providers.base import ProviderAdapter
 from app.ai.registry import build_routing_adapters
 from app.ai.schemas import AIProviderSelection, AITaskRequest, AITaskResponse

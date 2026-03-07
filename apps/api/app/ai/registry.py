@@ -79,8 +79,10 @@ def build_routing_adapters(settings: AIProviderSettings | None = None) -> list[M
     return [
         MiniMaxAdapter(
             api_key=resolved_settings.minimax_api_key,
+            api_host=resolved_settings.minimax_api_host,
             api_base_url=resolved_settings.minimax_api_base_url,
             text_model=resolved_settings.minimax_text_model,
             timeout_seconds=resolved_settings.minimax_timeout_seconds,
+            vision_timeout_seconds=resolved_settings.minimax_vision_timeout_seconds,
         )
     ]
