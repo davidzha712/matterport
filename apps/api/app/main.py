@@ -1,3 +1,4 @@
+from app.routers.ai import router as ai_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -18,11 +19,12 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=["http://localhost:3000"],
         allow_credentials=True,
-        allow_methods=["GET"],
+        allow_methods=["GET", "POST"],
         allow_headers=["*"],
     )
 
     api_prefix = "/api/v1"
+    app.include_router(ai_router, prefix=api_prefix)
     app.include_router(health_router, prefix=api_prefix)
     app.include_router(integrations_router, prefix=api_prefix)
     app.include_router(projects_router, prefix=api_prefix)

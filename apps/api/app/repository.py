@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from app.mock_data import PROJECTS, PROVIDERS
+from app.ai.registry import build_provider_summaries
+from app.mock_data import PROJECTS
 from app.models import ProjectSummary, ProviderSummary, SpaceSummary
 
 
@@ -22,5 +23,4 @@ def list_spaces(project_id: str) -> Sequence[SpaceSummary] | None:
 
 
 def list_providers() -> Sequence[ProviderSummary]:
-    return PROVIDERS
-
+    return build_provider_summaries()

@@ -10,6 +10,13 @@ class MatterportSettings(BaseModel):
     sdk_key: str | None = None
 
 
+class AIProviderSettings(BaseModel):
+    openai_api_key: str | None = None
+    qwen_api_key: str | None = None
+    kimi_api_key: str | None = None
+    minimax_api_key: str | None = None
+
+
 def _read_local_env() -> dict[str, str]:
     env_path = Path(__file__).resolve().parents[3] / ".env.local"
 
@@ -35,4 +42,15 @@ def get_matterport_settings() -> MatterportSettings:
         api_token_id=os.getenv("MATTERPORT_API_TOKEN_ID") or local_env.get("MATTERPORT_API_TOKEN_ID"),
         api_token_secret=os.getenv("MATTERPORT_API_TOKEN_SECRET") or local_env.get("MATTERPORT_API_TOKEN_SECRET"),
         sdk_key=os.getenv("NEXT_PUBLIC_MATTERPORT_SDK_KEY") or local_env.get("NEXT_PUBLIC_MATTERPORT_SDK_KEY"),
+    )
+
+
+def get_ai_provider_settings() -> AIProviderSettings:
+    local_env = _read_local_env()
+
+    return AIProviderSettings(
+        openai_api_key=os.getenv("OPENAI_API_KEY") or local_env.get("OPENAI_API_KEY"),
+        qwen_api_key=os.getenv("QWEN_API_KEY") or local_env.get("QWEN_API_KEY"),
+        kimi_api_key=os.getenv("KIMI_API_KEY") or local_env.get("KIMI_API_KEY"),
+        minimax_api_key=os.getenv("MINIMAX_API_KEY") or local_env.get("MINIMAX_API_KEY"),
     )
