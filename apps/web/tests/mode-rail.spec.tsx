@@ -4,17 +4,17 @@ import { describe, expect, it } from "vitest";
 import { ModeRail } from "../src/components/mode-rail";
 
 describe("ModeRail", () => {
-  it("renders all four platform modes as accessible links", () => {
+  it("renders all five platform modes as accessible links", () => {
     render(<ModeRail currentMode="work" spaceId="estate-grand-hall" />);
 
     expect(
       screen.getByRole("link", {
-        name: /explore/i,
+        name: /erkunden/i,
       }),
     ).toHaveAttribute("href", "/spaces/estate-grand-hall/explore");
     expect(
       screen.getByRole("link", {
-        name: /inventory|work/i,
+        name: /inventar/i,
       }),
     ).toHaveAttribute("href", "/spaces/estate-grand-hall/work");
     expect(
@@ -24,18 +24,22 @@ describe("ModeRail", () => {
     ).toHaveAttribute("href", "/spaces/estate-grand-hall/story");
     expect(
       screen.getByRole("link", {
-        name: /review/i,
+        name: /prüfen|pruefen/i,
       }),
     ).toHaveAttribute("href", "/spaces/estate-grand-hall/review");
+    expect(
+      screen.getByRole("link", {
+        name: /listing/i,
+      }),
+    ).toHaveAttribute("href", "/spaces/estate-grand-hall/listing");
   });
 
   it("marks the active mode for assistive technology", () => {
     render(<ModeRail currentMode="review" spaceId="estate-grand-hall" />);
 
-    expect(screen.getByRole("link", { name: /review/i })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /prüfen|pruefen/i })).toHaveAttribute(
       "aria-current",
       "page",
     );
   });
 });
-

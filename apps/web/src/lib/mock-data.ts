@@ -3,6 +3,7 @@ export type ObjectStatus = "Reviewed" | "Needs Review" | "Approved"
 
 export type ProviderProfile = {
   bestFor: string[]
+  configured?: boolean
   fallbackClass: string
   id: string
   label: string
@@ -52,6 +53,12 @@ export type ProjectRecord = {
 }
 
 const primaryLiveModelSid = process.env.NEXT_PUBLIC_MATTERPORT_MODEL_SID ?? "oyaicKWaEQw"
+const providerEnv = {
+  kimi: Boolean(process.env.KIMI_API_KEY),
+  minimax: Boolean(process.env.MINIMAX_API_KEY),
+  openai: Boolean(process.env.OPENAI_API_KEY),
+  qwen: Boolean(process.env.QWEN_API_KEY)
+}
 
 const projects: ProjectRecord[] = [
   {
@@ -59,7 +66,7 @@ const projects: ProjectRecord[] = [
     name: "Orchard Estate Review",
     status: "Active",
     summary:
-      "A multi-floor estate workflow focused on keep, sell, donate, and archive decisions across staged review queues.",
+      "Mehrgeschossiger Nachlass-Workflow fuer Behalten, Verkaufen, Spenden und Archivieren in klaren Review-Stufen.",
     vertical: "Estate",
     spaces: [
       {
@@ -69,7 +76,7 @@ const projects: ProjectRecord[] = [
         projectId: "estate-orchard",
         projectName: "Orchard Estate Review",
         summary:
-          "Large residential walkthrough with furniture, archives, and object disposition decisions spread across eight rooms.",
+          "Grosser Wohnrundgang mit Moebeln, Archivmaterialien und dispositionsrelevanten Objekten ueber mehrere Raeumlichkeiten.",
         rooms: [
           {
             id: "living-room",
@@ -77,8 +84,8 @@ const projects: ProjectRecord[] = [
             objectIds: ["walnut-cabinet", "mantel-clock"],
             pendingReviewCount: 3,
             priorityBand: "High",
-            recommendation: "Confirm disposition and capture higher-resolution details for valuables.",
-            summary: "Dense room with likely high-value furniture and mixed sentimental keepsakes."
+            recommendation: "Disposition bestaetigen und fuer wertige Objekte detailliertere Aufnahmen sichern.",
+            summary: "Dichter Raum mit wahrscheinlich wertigen Moebeln und gemischten sentimentalen Objekten."
           },
           {
             id: "study",
@@ -86,14 +93,14 @@ const projects: ProjectRecord[] = [
             objectIds: ["atlas-desk", "archive-box"],
             pendingReviewCount: 1,
             priorityBand: "Medium",
-            recommendation: "Review paper assets for archive handling before any disposal actions.",
-            summary: "Paper-heavy room with records, shelving, and one major desk cluster."
+            recommendation: "Papierbestaende vor jeder Aussonderung archivisch pruefen.",
+            summary: "Papierlastiger Raum mit Unterlagen, Regalen und einem zentralen Schreibtischcluster."
           }
         ],
         objects: [
           {
             aiSummary:
-              "Likely early 20th-century storage cabinet with intact joinery and strong resale potential after condition confirmation.",
+              "Wahrscheinlich ein Aufbewahrungsschrank des fruehen 20. Jahrhunderts mit intakter Verbindungstechnik und gutem Wiederverkaufspotenzial nach Zustandspruefung.",
             disposition: "Sell",
             id: "walnut-cabinet",
             roomId: "living-room",
@@ -104,7 +111,7 @@ const projects: ProjectRecord[] = [
           },
           {
             aiSummary:
-              "Mantel clock appears decorative and possibly sentimental; provenance interview recommended before disposition.",
+              "Die Kaminuhr wirkt dekorativ und moeglicherweise emotional bedeutsam; vor jeder Entscheidung wird ein Provenienzgespraech empfohlen.",
             disposition: "Keep",
             id: "mantel-clock",
             roomId: "living-room",
@@ -115,7 +122,7 @@ const projects: ProjectRecord[] = [
           },
           {
             aiSummary:
-              "Large desk with papers and drawers suggests mixed archive and resale workflow, requiring dual-track handling.",
+              "Der grosse Schreibtisch mit Papieren und Schubladen deutet auf einen kombinierten Archiv- und Verwertungsprozess hin und verlangt eine zweigleisige Behandlung.",
             disposition: "Archive",
             id: "atlas-desk",
             roomId: "study",
@@ -126,7 +133,7 @@ const projects: ProjectRecord[] = [
           },
           {
             aiSummary:
-              "Boxed letters and documents should remain under archive status until digitization or family review is complete.",
+              "Briefe und Dokumente in Boxen sollten im Archivstatus bleiben, bis Digitalisierung oder familiaere Sichtung abgeschlossen sind.",
             disposition: "Archive",
             id: "archive-box",
             roomId: "study",
@@ -144,7 +151,7 @@ const projects: ProjectRecord[] = [
     name: "Lantern House Digital Exhibition",
     status: "Pilot",
     summary:
-      "A museum-style narrative experience with guided tours, collection metadata, and object story cards layered onto a digital twin.",
+      "Museumsartige Erzaehlung mit Fuehrungen, Sammlungsmetadaten und Objektkarten ueber einem digitalen Zwilling.",
     vertical: "Museum",
     spaces: [
       {
@@ -154,7 +161,7 @@ const projects: ProjectRecord[] = [
         projectId: "museum-lantern",
         projectName: "Lantern House Digital Exhibition",
         summary:
-          "Curated gallery space designed for story mode, object metadata, and deep-zoom detail viewing.",
+          "Kuratiertes Galerieumfeld fuer Story-Modus, Objektmetadaten und spaetere Deep-Zoom-Detailansichten.",
         rooms: [
           {
             id: "intro-hall",
@@ -162,14 +169,14 @@ const projects: ProjectRecord[] = [
             objectIds: ["brass-lantern", "visitor-map"],
             pendingReviewCount: 0,
             priorityBand: "Low",
-            recommendation: "Ready for public story mode after caption final review.",
-            summary: "Introductory threshold space that anchors the guided narrative."
+            recommendation: "Nach finaler Pruefung der Beschriftung bereit fuer den oeffentlichen Story-Modus.",
+            summary: "Einfuehrender Schwellenraum, der die gefuehrte Erzaehlung verankert."
           }
         ],
         objects: [
           {
             aiSummary:
-              "Interpretive object with strong narrative value; pair with high-resolution image tiles and conservation notes.",
+              "Interpretatives Objekt mit starkem Erzaehlwert; ideal in Kombination mit hochaufgeloesten Bildkacheln und Konservierungsnotizen.",
             disposition: "Keep",
             id: "brass-lantern",
             roomId: "intro-hall",
@@ -180,7 +187,7 @@ const projects: ProjectRecord[] = [
           },
           {
             aiSummary:
-              "Visitor map supports orientation and should be linked from the right-hand context panel, not embedded into the stage.",
+              "Die Besucherkarte unterstuetzt die Orientierung und sollte aus dem rechten Kontextpanel verlinkt, nicht direkt in die Stage eingebettet werden.",
             disposition: "Keep",
             id: "visitor-map",
             roomId: "intro-hall",
@@ -198,35 +205,39 @@ const projects: ProjectRecord[] = [
 const providers: ProviderProfile[] = [
   {
     bestFor: ["tool orchestration", "multimodal coordination", "final user responses"],
+    configured: providerEnv.openai,
     fallbackClass: "premium-generalist",
     id: "openai",
     label: "OpenAI GPT",
-    specialty: "Strong reasoning and workflow orchestration",
-    status: "Active"
+    specialty: "Stark in Reasoning und Workflow-Orchestrierung",
+    status: providerEnv.openai ? "Active" : "Needs Review"
   },
   {
-    bestFor: ["self-hosting strategy", "vision-heavy parsing", "enterprise cost control"],
+    bestFor: ["Self-Hosting-Strategie", "visuelle Analyse", "unternehmensweite Kostenkontrolle"],
+    configured: providerEnv.qwen,
     fallbackClass: "vision-economy",
     id: "qwen",
     label: "Qwen",
-    specialty: "Cost-sensitive multimodal parsing",
-    status: "Pilot"
+    specialty: "Kostensensible multimodale Analyse",
+    status: providerEnv.qwen ? "Active" : "Pilot"
   },
   {
-    bestFor: ["long context", "agentic document review", "multi-step narrative assembly"],
+    bestFor: ["lange Kontexte", "agentische Dokumentpruefung", "mehrstufige Narrativbildung"],
+    configured: providerEnv.kimi,
     fallbackClass: "long-context",
     id: "kimi",
     label: "Kimi",
-    specialty: "Long-context multimodal analysis",
-    status: "Pilot"
+    specialty: "Langkontextuelle multimodale Analyse",
+    status: providerEnv.kimi ? "Active" : "Pilot"
   },
   {
-    bestFor: ["speech", "video", "broad modality coverage"],
+    bestFor: ["Sprache", "Video", "breite Modalitaetsabdeckung"],
+    configured: providerEnv.minimax,
     fallbackClass: "media-extended",
     id: "minimax",
     label: "MiniMax",
-    specialty: "Audio and media extension layer",
-    status: "Needs Review"
+    specialty: "Audio- und Medienerweiterung",
+    status: providerEnv.minimax ? "Active" : "Needs Review"
   }
 ]
 

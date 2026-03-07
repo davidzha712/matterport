@@ -4,17 +4,16 @@ export default function NotFound() {
   return (
     <main className="empty-state">
       <div className="empty-state__panel">
-        <p className="eyebrow">Route not found</p>
-        <h1>That space view does not exist.</h1>
+        <p className="eyebrow">Route nicht gefunden</p>
+        <h1>Diese Raumansicht existiert nicht.</h1>
         <p>
-          The platform keeps project, space, room, and object context in the URL. Double-check
-          the identifier or return to the dashboard.
+          Die Plattform fuehrt Projekt-, Space-, Raum- und Objektkontext direkt in der URL. Bitte
+          pruefe die Kennung oder gehe zur Uebersicht zurueck.
         </p>
         <Link className="primary-link" href="/">
-          Return home
+          Zur Startseite
         </Link>
       </div>
     </main>
   )
 }
-

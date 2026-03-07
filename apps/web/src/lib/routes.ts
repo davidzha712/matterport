@@ -1,7 +1,15 @@
-export const STAGE_MODES = ["explore", "work", "story", "review"] as const
+export const STAGE_MODES = ["explore", "work", "story", "review", "listing"] as const
 export const immersiveModes = [...STAGE_MODES]
 
 export type StageMode = (typeof STAGE_MODES)[number]
+
+export const stageModeLabels: Record<StageMode, string> = {
+  explore: "Erkunden",
+  listing: "Listing Prep",
+  review: "Prüfen",
+  story: "Story",
+  work: "Inventar"
+}
 
 export function isStageMode(value: string): value is StageMode {
   return STAGE_MODES.includes(value as StageMode)

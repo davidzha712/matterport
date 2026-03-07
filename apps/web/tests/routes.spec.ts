@@ -9,8 +9,8 @@ import {
 } from "../src/lib/routes";
 
 describe("immersive route helpers", () => {
-  it("exposes the four supported immersive modes for the shared shell", () => {
-    expect(immersiveModes).toEqual(["explore", "work", "story", "review"]);
+  it("exposes the five supported immersive modes for the shared shell", () => {
+    expect(immersiveModes).toEqual(["explore", "work", "story", "review", "listing"]);
   });
 
   it("builds canonical mode-aware space routes", () => {
@@ -19,6 +19,9 @@ describe("immersive route helpers", () => {
     );
     expect(buildSpaceRoute("estate-grand-hall", "work")).toBe(
       "/spaces/estate-grand-hall/work",
+    );
+    expect(buildSpaceRoute("estate-grand-hall", "listing")).toBe(
+      "/spaces/estate-grand-hall/listing",
     );
   });
 
@@ -37,4 +40,3 @@ describe("immersive route helpers", () => {
     expect(resolveImmersiveMode(undefined)).toBe("explore");
   });
 });
-

@@ -1,20 +1,29 @@
-import { getProviderProfiles } from "@/lib/mock-data"
-import { toToneToken } from "@/lib/presentation"
+import { getRuntimeProviderProfiles } from "@/lib/provider-service"
+import { toDisplayWorkflowStatus, toToneToken } from "@/lib/presentation"
 
-export default function ProviderSettingsPage() {
-  const providers = getProviderProfiles()
+export default async function ProviderSettingsPage() {
+  const providers = await getRuntimeProviderProfiles()
+  const configuredCount = providers.filter((provider) => provider.configured).length
 
   return (
     <main className="settings-shell" id="main-content">
       <section className="section-card">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Provider controls</p>
-            <h1>Model routing is configurable, but keys never leave the backend.</h1>
+            <p className="eyebrow">Provider-Steuerung</p>
+            <h1>Modellrouting ist konfigurierbar, aber Schluessel verlassen nie das Backend.</h1>
           </div>
           <p>
-            This view is the UX contract for multi-provider onboarding. Actual secrets are stored
-            server-side and should be encrypted at rest with tenant-scoped audit logging.
+            Diese Ansicht ist der UX-Vertrag fuer Multi-Provider-Onboarding. Secrets bleiben
+            serverseitig, verschluesselt und revisionsfaehig.
+          </p>
+        </div>
+        <div className="context-banner">
+          <p className="eyebrow">Aktueller Zustand</p>
+          <h2>{configuredCount} von {providers.length} Providern sind fuer das Routing bereit.</h2>
+          <p>
+            Fuer lokale Entwicklung reicht ein Eintrag in `.env.local`. Die UI zeigt nur
+            Verbindungsstatus, keine Keys.
           </p>
         </div>
         <div className="provider-settings-grid">
@@ -25,20 +34,26 @@ export default function ProviderSettingsPage() {
                   <p className="eyebrow">{provider.label}</p>
                   <h2>{provider.specialty}</h2>
                 </div>
-                <span className={`pill pill--${toToneToken(provider.status)}`}>{provider.status}</span>
+                <span className={`pill pill--${toToneToken(provider.status)}`}>
+                  {toDisplayWorkflowStatus(provider.status)}
+                </span>
               </header>
               <dl className="provider-card__facts">
                 <div>
-                  <dt>Best for</dt>
+                  <dt>Geeignet fuer</dt>
                   <dd>{provider.bestFor.join(", ")}</dd>
                 </div>
                 <div>
-                  <dt>Fallback class</dt>
+                  <dt>Fallback-Klasse</dt>
                   <dd>{provider.fallbackClass}</dd>
                 </div>
                 <div>
-                  <dt>Credential posture</dt>
-                  <dd>Masked in UI, versioned on the server, approval-gated on change.</dd>
+                  <dt>Key-Status</dt>
+                  <dd>{provider.configured ? "Verbunden und backendseitig nutzbar." : "Noch nicht im Backend hinterlegt."}</dd>
+                </div>
+                <div>
+                  <dt>Governance</dt>
+                  <dd>Maskiert in der UI, versioniert auf dem Server, freigabepflichtig bei Aenderung.</dd>
                 </div>
               </dl>
             </article>

@@ -1,49 +1,112 @@
 import Link from "next/link"
 import { ProjectOverviewCard } from "@/components/project-overview-card"
-import { getProjects, getProviderProfiles } from "@/lib/mock-data"
-import { toToneToken } from "@/lib/presentation"
+import { getProjects } from "@/lib/mock-data"
+import { getRuntimeProviderProfiles } from "@/lib/provider-service"
+import { toDisplayWorkflowStatus, toToneToken } from "@/lib/presentation"
 import { buildSpaceRoute } from "@/lib/routes"
 
-export default function HomePage() {
+export default async function HomePage() {
   const projects = getProjects()
-  const providers = getProviderProfiles()
+  const providers = await getRuntimeProviderProfiles()
   const featuredSpace = projects[0]?.spaces[0]
+  const totalSpaces = projects.reduce((total, project) => total + project.spaces.length, 0)
+  const totalObjects = projects.reduce(
+    (projectTotal, project) =>
+      projectTotal + project.spaces.reduce((spaceTotal, space) => spaceTotal + space.objects.length, 0),
+    0
+  )
 
   return (
     <main className="home-shell" id="main-content">
-      <section className="hero-panel">
+      <section className="hero-panel hero-panel--immersive">
+        <div className="hero-panel__veil" aria-hidden="true" />
         <div className="hero-copy">
-          <p className="eyebrow">AI-native immersive platform</p>
-          <h1>Run many Matterport spaces inside one reusable operational shell.</h1>
+          <p className="eyebrow">Primaersprache Deutsch, Englisch folgt</p>
+          <h1>Raeumliche Intelligenz fuer Haeuser, Sammlungen und kuratierte Rundgaenge.</h1>
+          <h2 className="hero-copy__headline">
+            Matterport wird zur Buehne. Objektwissen, KI-Orchestrierung und Review-Logik liegen
+            direkt darueber.
+          </h2>
           <p className="hero-copy__body">
-            This framework is built for multiple estates, museums, or inventory programs. The
-            space is the stage. Structured objects, AI routing, human review, and exports live
-            above it.
+            Das hier ist keine gewoehnliche Projektseite. Es ist eine wiederverwendbare immersive
+            Plattform: Matterport als raeumliche Buehne, strukturierte Objektidentitaet als
+            Wissensschicht und geroutete multimodale KI als operativer Copilot.
           </p>
           <div className="hero-actions">
             {featuredSpace ? (
               <Link className="button button--primary" href={buildSpaceRoute(featuredSpace.id)}>
-                Enter featured space
+                Live-Space betreten
               </Link>
             ) : null}
             <Link className="button button--secondary" href="/settings/providers">
-              Review provider setup
+              Provider-Konfiguration pruefen
             </Link>
           </div>
+          <div className="entry-matrix" aria-label="Primaere Plattformzugriffe">
+            <article className="entry-card">
+              <p className="eyebrow">Explorer</p>
+              <h3>Full-screen Space Explorer</h3>
+              <p>Raeumliche Orientierung mit rechter Wissensschicht und unterer Modusnavigation.</p>
+            </article>
+            <article className="entry-card">
+              <p className="eyebrow">Objektebene</p>
+              <h3>Dossiers statt Hotspots</h3>
+              <p>Jedes Objekt bekommt Status, Story, Notizen, Provenienz und spaetere IIIF-Layer.</p>
+            </article>
+            <article className="entry-card">
+              <p className="eyebrow">Workflow</p>
+              <h3>Review first</h3>
+              <p>Menschliche Freigaben bleiben verbindlich, KI liefert nur analysierbare Vorschlaege.</p>
+            </article>
+          </div>
         </div>
-        <div className="hero-metrics" aria-label="Platform posture">
-          <div className="metric-card">
-            <span>Projects</span>
-            <strong>{projects.length}</strong>
+        <div className="hero-sidebar" aria-label="Plattformstatus">
+          <div className="hero-metrics hero-metrics--stacked">
+            <div className="metric-card">
+              <span>Projekte</span>
+              <strong>{projects.length}</strong>
+            </div>
+            <div className="metric-card">
+              <span>Spaces</span>
+              <strong>{totalSpaces}</strong>
+            </div>
+            <div className="metric-card">
+              <span>Provider</span>
+              <strong>{providers.length}</strong>
+            </div>
+            <div className="metric-card metric-card--wide">
+              <span>Objekte</span>
+              <strong>{totalObjects}</strong>
+              <p>Review-first modelliert, mehrprojektfaehig und spaeter exportierbar.</p>
+            </div>
           </div>
-          <div className="metric-card">
-            <span>Spaces</span>
-            <strong>{projects.reduce((total, project) => total + project.spaces.length, 0)}</strong>
-          </div>
-          <div className="metric-card">
-            <span>Provider adapters</span>
-            <strong>{providers.length}</strong>
-          </div>
+
+          {featuredSpace ? (
+            <div className="hero-preview">
+              <div className="hero-preview__header">
+                <div>
+                  <p className="eyebrow">Aktive Buehne</p>
+                  <h3>{featuredSpace.name}</h3>
+                </div>
+                <span className="pill pill--active">Matterport live</span>
+              </div>
+              <p>{featuredSpace.summary}</p>
+              <ul className="hero-preview__chips">
+                <li>Erkunden</li>
+                <li>Story</li>
+                <li>Pruefen</li>
+                <li>Listing</li>
+              </ul>
+              <ul className="hero-preview__facts">
+                {featuredSpace.rooms.slice(0, 3).map((room) => (
+                  <li key={room.id}>
+                    <strong>{room.name}</strong>
+                    <span>{room.objectIds.length} Objekte</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       </section>
 
@@ -52,9 +115,12 @@ export default function HomePage() {
           <div className="section-heading">
             <div>
               <p className="eyebrow">Portfolio</p>
-              <h2>Projects</h2>
+              <h2>Projektlandschaft</h2>
             </div>
-            <p>Every project can contain multiple Matterport spaces and workflow rules.</p>
+            <p>
+              Jedes Projekt kann mehrere Matterport-Spaces, Objektlagen, Review-Regeln und
+              Erzaehlpfade fuehren.
+            </p>
           </div>
           <div className="project-grid">
             {projects.map((project) => (
@@ -67,9 +133,9 @@ export default function HomePage() {
           <div className="section-heading">
             <div>
               <p className="eyebrow">Routing</p>
-              <h2>Model policy baseline</h2>
+              <h2>Modellpolitik</h2>
             </div>
-            <p>Providers stay server-side; the UI shows intent, not raw keys.</p>
+            <p>Provider bleiben serverseitig; die UI zeigt nur Status und Einsatzklasse.</p>
           </div>
           <ul className="provider-list" aria-label="Configured providers">
             {providers.map((provider) => (
@@ -78,7 +144,12 @@ export default function HomePage() {
                   <strong>{provider.label}</strong>
                   <p>{provider.specialty}</p>
                 </div>
-                <span className={`pill pill--${toToneToken(provider.status)}`}>{provider.status}</span>
+                <div className="provider-list__meta">
+                  <span className={`pill pill--${toToneToken(provider.status)}`}>
+                    {toDisplayWorkflowStatus(provider.status)}
+                  </span>
+                  <small>{provider.configured ? "Verbunden" : "Noch nicht hinterlegt"}</small>
+                </div>
               </li>
             ))}
           </ul>

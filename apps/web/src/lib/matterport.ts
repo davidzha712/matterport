@@ -13,7 +13,7 @@ export function getMatterportEmbedStatus(space: SpaceRecord): EmbedStatus {
 
   if (modelSid) {
     return {
-      label: sdkKeyStatus === "available" ? "SDK-ready" : "Viewer-ready",
+      label: sdkKeyStatus === "available" ? "SDK bereit" : "Viewer bereit",
       modelSid,
       sdkKeyStatus,
       state: "connected"
@@ -21,7 +21,7 @@ export function getMatterportEmbedStatus(space: SpaceRecord): EmbedStatus {
   }
 
   return {
-    label: "Design mode",
+    label: "Design-Modus",
     modelSid,
     sdkKeyStatus,
     state: "standby"
