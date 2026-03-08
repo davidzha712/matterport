@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { SpaceRecord } from "../src/lib/mock-data"
+import type { SpaceRecord } from "../src/lib/platform-types"
 import { getMatterportEmbedStatus, getMatterportEmbedUrl } from "../src/lib/matterport"
 
 const baseSpace: SpaceRecord = {

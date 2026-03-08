@@ -1,5 +1,10 @@
+"use client"
+
+import { useCallback } from "react"
 import type { SpaceRecord } from "@/lib/mock-data"
 import { getMatterportEmbedStatus, getMatterportEmbedUrl } from "@/lib/matterport"
+import { useBridge } from "@/lib/bridge-context"
+import { useT } from "@/lib/i18n"
 import type { ReactNode } from "react"
 
 export function MatterportStage({
@@ -11,6 +16,19 @@ export function MatterportStage({
 }) {
   const embed = getMatterportEmbedStatus(space)
   const iframeSource = embed.modelSid ? getMatterportEmbedUrl(embed.modelSid) : null
+  const { bridge } = useBridge()
+  const t = useT()
+
+  const iframeRefCallback = useCallback(
+    (node: HTMLIFrameElement | null) => {
+      if (node) {
+        bridge.attachIframe(node)
+      } else {
+        bridge.detach()
+      }
+    },
+    [bridge]
+  )
 
   return (
     <section aria-label="Immersive Stage" className="stage-shell">
@@ -19,6 +37,7 @@ export function MatterportStage({
           allow="fullscreen; xr-spatial-tracking; accelerometer; gyroscope"
           className="stage-iframe"
           loading="eager"
+          ref={iframeRefCallback}
           referrerPolicy="strict-origin-when-cross-origin"
           src={iframeSource}
           title={`${space.name} Matterport stage`}

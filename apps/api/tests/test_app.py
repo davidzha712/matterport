@@ -82,16 +82,22 @@ def test_object_workflow_patch_updates_state_and_adds_audit_event() -> None:
     response = client.patch(
         "/api/v1/spaces/orchard-main-house/objects/walnut-cabinet",
         json={
+            "aiSummary": "Familie bestaetigt die hochwertige Verarbeitung und moechte die Beschreibung schaerfen.",
             "disposition": "Keep",
             "reviewer": "museum-ops",
             "note": "Familiengespraech hat Behalten bestaetigt.",
+            "title": "Walnut Display Cabinet",
+            "type": "Case Furniture",
         },
     )
 
     assert response.status_code == 200
     payload = response.json()
+    assert payload["objectRecord"]["aiSummary"].startswith("Familie bestaetigt")
     assert payload["objectRecord"]["disposition"] == "Keep"
     assert payload["objectRecord"]["status"] == "Reviewed"
+    assert payload["objectRecord"]["title"] == "Walnut Display Cabinet"
+    assert payload["objectRecord"]["type"] == "Case Furniture"
     assert payload["workflow"]["pendingReviewCount"] == 1
     assert payload["auditEvent"]["reviewer"] == "museum-ops"
     assert payload["auditEvent"]["before"]["disposition"] == "Sell"
@@ -132,3 +138,77 @@ def test_matterport_status_masks_secret_configuration() -> None:
     assert payload["service"] == "matterport"
     assert "tokenSecret" not in payload
     assert "sdkKey" not in payload
+
+
+def test_annotation_crud() -> None:
+    # Create
+    response = client.post("/api/v1/spaces/elternhaus-main/annotations", json={
+        "label": "Antiker Schrank",
+        "description": "Ein grosser Holzschrank im Flur",
+        "position": {"x": 1.5, "y": 0.0, "z": 3.2},
+        "createdBy": "manual",
+    })
+    assert response.status_code == 201
+    data = response.json()
+    assert data["label"] == "Antiker Schrank"
+    assert data["spaceId"] == "elternhaus-main"
+    assert data["position"]["x"] == 1.5
+    annotation_id = data["annotationId"]
+
+    # List
+    response = client.get("/api/v1/spaces/elternhaus-main/annotations")
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+
+    # Update
+    response = client.patch(f"/api/v1/spaces/elternhaus-main/annotations/{annotation_id}", json={
+        "label": "Eichenschrank",
+        "position": {"x": 1.5, "y": 0.1, "z": 3.2},
+    })
+    assert response.status_code == 200
+    assert response.json()["label"] == "Eichenschrank"
+    assert response.json()["position"]["y"] == 0.1
+
+    # Delete
+    response = client.delete(f"/api/v1/spaces/elternhaus-main/annotations/{annotation_id}")
+    assert response.status_code == 204
+
+    # List after delete
+    response = client.get("/api/v1/spaces/elternhaus-main/annotations")
+    assert response.status_code == 200
+    assert len(response.json()) == 0
+
+
+def test_annotation_not_found() -> None:
+    response = client.patch("/api/v1/spaces/elternhaus-main/annotations/nonexistent", json={
+        "label": "test",
+    })
+    assert response.status_code == 404
+
+
+def test_annotation_validation() -> None:
+    response = client.post("/api/v1/spaces/elternhaus-main/annotations", json={
+        "label": "",
+        "position": {"x": 0, "y": 0, "z": 0},
+        "createdBy": "manual",
+    })
+    assert response.status_code == 422
+
+
+def test_ai_annotation_with_confidence() -> None:
+    response = client.post("/api/v1/spaces/elternhaus-main/annotations", json={
+        "label": "Gemaelde",
+        "description": "Oelgemaelde, wahrscheinlich 19. Jahrhundert",
+        "position": {"x": 2.0, "y": 1.5, "z": 0.1},
+        "createdBy": "ai",
+        "confidence": 0.85,
+    })
+    assert response.status_code == 201
+    data = response.json()
+    assert data["createdBy"] == "ai"
+    assert data["confidence"] == 0.85
+
+
+def test_annotation_delete_not_found() -> None:
+    response = client.delete("/api/v1/spaces/elternhaus-main/annotations/nonexistent")
+    assert response.status_code == 404

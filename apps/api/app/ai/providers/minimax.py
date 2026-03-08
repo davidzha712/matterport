@@ -1,33 +1,18 @@
 from __future__ import annotations
 
 import base64
-import binascii
-import ipaddress
-import socket
-from urllib.parse import urlparse
 
 import httpx
 
-from app.ai.errors import TaskInputValidationError
+from app.ai.errors import ProviderInvocationError, TaskInputValidationError
+from app.ai.providers.shared import (
+    ALLOWED_IMAGE_TYPES,
+    MAX_IMAGE_BYTES,
+    SYSTEM_PROMPTS,
+    validate_data_image_url,
+    validate_remote_image_url,
+)
 from app.ai.schemas import AITaskOutput, AITaskRequest
-
-
-class ProviderInvocationError(RuntimeError):
-    pass
-
-
-SYSTEM_PROMPTS: dict[str, str] = {
-    "narrative-summarize": (
-        "You are a museum-grade interpretive writer for immersive estate and collection spaces. "
-        "Respond in the same language as the user's prompt, stay factual, mark uncertainty "
-        "explicitly, and keep the answer concise."
-    ),
-    "workflow-assist": (
-        "You are a human-in-the-loop workflow planner for estate review and collection operations. "
-        "Respond in the same language as the user's prompt. Produce a concise, sequenced plan that "
-        "never bypasses human approval or publication review."
-    ),
-}
 
 
 class MiniMaxAdapter:
@@ -267,7 +252,7 @@ class MiniMaxAdapter:
 
     def _normalize_image_source(self, image_source: str) -> tuple[str, str]:
         if image_source.startswith("data:image/"):
-            self._validate_data_image_url(image_source)
+            validate_data_image_url(image_source)
             return image_source, "inline-upload"
 
         if image_source.startswith("https://"):
@@ -277,31 +262,8 @@ class MiniMaxAdapter:
             "Image attachments must be uploaded images or secure HTTPS image URLs."
         )
 
-    def _validate_data_image_url(self, image_source: str) -> None:
-        header, separator, encoded_payload = image_source.partition(",")
-        if not separator or ";base64" not in header:
-            raise TaskInputValidationError(
-                "Uploaded images must be encoded as base64 data URLs."
-            )
-
-        media_type = header.split(":", 1)[1].split(";", 1)[0].lower()
-        if media_type not in {"image/jpeg", "image/png", "image/webp"}:
-            raise TaskInputValidationError(
-                "Only JPEG, PNG, and WebP images are supported."
-            )
-
-        try:
-            image_bytes = base64.b64decode(encoded_payload, validate=True)
-        except (ValueError, binascii.Error) as exc:
-            raise TaskInputValidationError("The uploaded image could not be decoded.") from exc
-
-        if len(image_bytes) > 8 * 1024 * 1024:
-            raise TaskInputValidationError(
-                "Uploaded images must be 8 MB or smaller."
-            )
-
     def _download_image_as_data_url(self, image_url: str) -> str:
-        self._validate_remote_image_url(image_url)
+        validate_remote_image_url(image_url)
 
         try:
             with httpx.Client(timeout=self._vision_timeout_seconds) as client:
@@ -314,48 +276,17 @@ class MiniMaxAdapter:
 
         content_type = response.headers.get("content-type", "").split(";", 1)[0].lower()
         normalized_content_type = self._normalize_content_type(content_type, image_url)
-        if normalized_content_type not in {"image/jpeg", "image/png", "image/webp"}:
+        if normalized_content_type not in ALLOWED_IMAGE_TYPES:
             raise TaskInputValidationError(
                 "Only JPEG, PNG, and WebP image URLs are supported."
             )
 
         image_bytes = response.content
-        if len(image_bytes) > 8 * 1024 * 1024:
+        if len(image_bytes) > MAX_IMAGE_BYTES:
             raise TaskInputValidationError("Remote images must be 8 MB or smaller.")
 
         encoded = base64.b64encode(image_bytes).decode("utf-8")
         return f"data:{normalized_content_type};base64,{encoded}"
-
-    def _validate_remote_image_url(self, image_url: str) -> None:
-        parsed = urlparse(image_url)
-        if parsed.scheme != "https" or not parsed.hostname:
-            raise TaskInputValidationError(
-                "Image URLs must start with https:// and include a hostname."
-            )
-
-        try:
-            addresses = socket.getaddrinfo(parsed.hostname, None, type=socket.SOCK_STREAM)
-        except socket.gaierror as exc:
-            raise TaskInputValidationError("The image hostname could not be resolved.") from exc
-
-        for family, _, _, _, sockaddr in addresses:
-            if family == socket.AF_INET6:
-                candidate_ip = sockaddr[0]
-            else:
-                candidate_ip = sockaddr[0]
-
-            ip = ipaddress.ip_address(candidate_ip)
-            if (
-                ip.is_private
-                or ip.is_loopback
-                or ip.is_link_local
-                or ip.is_multicast
-                or ip.is_reserved
-                or ip.is_unspecified
-            ):
-                raise TaskInputValidationError(
-                    "Local or private-network image URLs are not allowed."
-                )
 
     def _normalize_content_type(self, content_type: str, image_url: str) -> str:
         if content_type in {"image/jpeg", "image/png", "image/webp"}:

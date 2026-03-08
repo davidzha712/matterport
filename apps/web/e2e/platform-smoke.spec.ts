@@ -11,11 +11,13 @@ test("home page exposes the multi-project immersive platform entry points", asyn
   await expect(page.getByRole("link", { name: /live-space betreten/i })).toBeVisible();
 });
 
-test("space shell keeps control layers visible on mobile", async ({ page }) => {
+test("space shell opens in immersive mode and can recall command layers on mobile", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/spaces/orchard-main-house/explore", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByRole("main")).toBeVisible();
+  await expect(page.getByRole("button", { name: /command/i })).toBeVisible();
+  await page.getByRole("button", { name: /command/i }).click();
   await expect(page.getByLabel(/bild-url/i)).toBeVisible();
   await expect(page.getByRole("button", { name: /analyse starten/i })).toBeDisabled();
   await expect(page.getByRole("navigation", { name: /raummodi/i })).toBeVisible();

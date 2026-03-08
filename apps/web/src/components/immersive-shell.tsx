@@ -6,6 +6,11 @@ import { CommandBar } from "@/components/command-bar"
 import { ContextPanel } from "@/components/context-panel"
 import { MatterportStage } from "@/components/matterport-stage"
 import { ModeRail } from "@/components/mode-rail"
+import { StageControls } from "@/components/stage-controls"
+import { StageToolbar } from "@/components/stage-toolbar"
+import { LocaleSwitcher } from "@/components/locale-switcher"
+import { BridgeProvider, useBridge } from "@/lib/bridge-context"
+import { useT } from "@/lib/i18n"
 import type { ObjectRecord, ProviderProfile, RoomRecord, SpaceRecord } from "@/lib/mock-data"
 import { buildSpaceRoute } from "@/lib/routes"
 import { stageModeLabels, type StageMode } from "@/lib/routes"
@@ -18,7 +23,15 @@ type ImmersiveShellProps = {
   space: SpaceRecord
 }
 
-export function ImmersiveShell({
+export function ImmersiveShell(props: ImmersiveShellProps) {
+  return (
+    <BridgeProvider>
+      <ImmersiveShellInner {...props} />
+    </BridgeProvider>
+  )
+}
+
+function ImmersiveShellInner({
   focusMode,
   providers,
   selectedObject,
@@ -26,6 +39,8 @@ export function ImmersiveShell({
   space
 }: ImmersiveShellProps) {
   const reduceMotion = useReducedMotion()
+  const t = useT()
+  const { bridge, status } = useBridge()
   const focalRoom = selectedRoom ?? space.rooms[0]
   const focalObject = selectedObject ?? space.objects[0]
   const enterFromTop = { opacity: 1, y: 0 }
@@ -48,27 +63,29 @@ export function ImmersiveShell({
               <span>{space.name}</span>
               <span>{stageModeLabels[focusMode]}</span>
             </div>
-            <p className="eyebrow">Immersive Wissensräume</p>
+            <p className="eyebrow">{t.hero.eyebrow}</p>
             <h1>{space.projectName}</h1>
           </div>
           <nav aria-label="Global">
             <ul className="inline-nav">
               <li>
-                <Link href="/">Uebersicht</Link>
+                <Link href="/">{t.stage.overview}</Link>
               </li>
               <li>
-                <Link href="/settings/providers">Provider</Link>
+                <Link href="/settings/providers">{t.stage.providers}</Link>
               </li>
               <li>
-                <Link href="/review-center">Review Center</Link>
+                <Link href="/review-center">{t.stage.reviewCenter}</Link>
               </li>
               <li>
-                <Link href="/export-center">Export</Link>
+                <Link href="/export-center">{t.stage.export}</Link>
               </li>
               <li>
-                <Link href={buildSpaceRoute(space.id, "review")}>Stage Review</Link>
+                <Link href={buildSpaceRoute(space.id, "review")}>{t.stage.stageReview}</Link>
               </li>
-              <li className="inline-nav__locale">DE zuerst · EN folgt</li>
+              <li className="inline-nav__locale">
+                <LocaleSwitcher />
+              </li>
             </ul>
           </nav>
         </motion.header>
@@ -81,22 +98,22 @@ export function ImmersiveShell({
         >
           <div className="stage-intro-card">
             <div>
-              <p className="eyebrow">Aktuelle Szene</p>
+              <p className="eyebrow">{t.stage.currentScene}</p>
               <h2>{space.name}</h2>
             </div>
             <p>{space.summary}</p>
             <ul className="stage-intro-card__metrics">
-              <li>{space.rooms.length} Räume erfasst</li>
-              <li>{space.objects.length} Objekte verfolgt</li>
-              <li>Modus: {stageModeLabels[focusMode]}</li>
+              <li>{space.rooms.length} {t.stage.roomsCaptured}</li>
+              <li>{space.objects.length} {t.stage.objectsTracked}</li>
+              <li>{t.stage.mode}: {stageModeLabels[focusMode]}</li>
             </ul>
             <div className="stage-highlight-rail">
               <div className="stage-highlight-card">
-                <span>Objektfokus</span>
+                <span>{t.stage.objectFocus}</span>
                 <strong>{focalObject.title}</strong>
               </div>
               <div className="stage-highlight-card">
-                <span>Raumkontext</span>
+                <span>{t.stage.roomContext}</span>
                 <strong>{focalRoom.name}</strong>
               </div>
             </div>
@@ -118,19 +135,8 @@ export function ImmersiveShell({
           />
         </motion.aside>
 
-        <motion.section
-          animate={enterFromBottom}
-          className="stage-room-strip"
-          initial={reduceMotion ? false : { opacity: 0, y: 24 }}
-          transition={{ ...immediateTransition, delay: reduceMotion ? 0 : 0.18 }}
-        >
-          {space.rooms.map((room) => (
-            <Link className="room-chip" href={`/spaces/${space.id}/rooms/${room.id}`} key={room.id}>
-              <span>{room.name}</span>
-              <small>{room.objectIds.length} Objekte</small>
-            </Link>
-          ))}
-        </motion.section>
+        <StageControls />
+        <StageToolbar bridge={bridge} />
 
         <motion.footer
           animate={enterFromBottom}
@@ -140,7 +146,7 @@ export function ImmersiveShell({
         >
           <div className="stage-storyline">
             <div>
-              <p className="eyebrow">Räumlicher Kontext</p>
+              <p className="eyebrow">{t.stage.spatialContext}</p>
               <strong>{focalRoom.name}</strong>
             </div>
             <p>{focalObject.title}</p>

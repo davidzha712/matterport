@@ -1,70 +1,19 @@
-export type WorkflowStatus = "Active" | "Pilot" | "Needs Review"
-export type ObjectStatus = "Reviewed" | "Needs Review" | "Approved"
+import type {
+  ProjectRecord,
+  ProviderProfile,
+  ReviewQueueItem,
+} from "@/lib/platform-types"
 
-export type ProviderProfile = {
-  bestFor: string[]
-  configured?: boolean
-  fallbackClass: string
-  id: string
-  label: string
-  specialty: string
-  status: WorkflowStatus
-}
-
-export type ObjectRecord = {
-  aiSummary: string
-  disposition: "Keep" | "Sell" | "Donate" | "Archive"
-  id: string
-  roomId: string
-  roomName: string
-  status: ObjectStatus
-  title: string
-  type: string
-}
-
-export type RoomRecord = {
-  id: string
-  name: string
-  objectIds: string[]
-  pendingReviewCount: number
-  priorityBand: "High" | "Medium" | "Low"
-  recommendation: string
-  summary: string
-}
-
-export type SpaceRecord = {
-  id: string
-  matterportModelSid?: string
-  name: string
-  objects: ObjectRecord[]
-  projectId: string
-  projectName: string
-  rooms: RoomRecord[]
-  summary: string
-}
-
-export type ProjectRecord = {
-  id: string
-  name: string
-  spaces: SpaceRecord[]
-  status: WorkflowStatus
-  summary: string
-  vertical: "Estate" | "Museum" | "Collection"
-}
-
-export type ReviewQueueItem = {
-  disposition: ObjectRecord["disposition"]
-  objectId: string
-  objectTitle: string
-  priorityBand: RoomRecord["priorityBand"]
-  projectId: string
-  projectName: string
-  roomId: string
-  roomName: string
-  spaceId: string
-  spaceName: string
-  status: ObjectStatus
-}
+export type {
+  ObjectRecord,
+  ObjectStatus,
+  ProjectRecord,
+  ProviderProfile,
+  ReviewQueueItem,
+  RoomRecord,
+  SpaceRecord,
+  WorkflowStatus,
+} from "@/lib/platform-types"
 
 const primaryLiveModelSid = process.env.NEXT_PUBLIC_MATTERPORT_MODEL_SID ?? "oyaicKWaEQw"
 const providerEnv = {

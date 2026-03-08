@@ -15,8 +15,14 @@ class AliasedModel(BaseModel):
 
 class AITaskAttachment(AliasedModel):
     kind: Literal["image", "document", "audio", "video"] = "image"
-    url: str | None = None
-    label: str | None = None
+    url: str | None = Field(default=None, max_length=12_000_000)
+    label: str | None = Field(default=None, max_length=200)
+
+
+class AITaskContext(AliasedModel):
+    capture_mode: str | None = Field(default=None, alias="captureMode", max_length=50)
+    matterport_model_sid: str | None = Field(default=None, alias="matterportModelSid", max_length=50)
+    mode: str | None = Field(default=None, max_length=30)
 
 
 class AITaskInput(AliasedModel):
@@ -24,8 +30,8 @@ class AITaskInput(AliasedModel):
     project_id: str | None = Field(default=None, alias="projectId")
     space_id: str | None = Field(default=None, alias="spaceId")
     room_id: str | None = Field(default=None, alias="roomId")
-    attachments: list[AITaskAttachment] = Field(default_factory=list)
-    context: dict[str, Any] = Field(default_factory=dict)
+    attachments: list[AITaskAttachment] = Field(default_factory=list, max_length=10)
+    context: AITaskContext = Field(default_factory=AITaskContext)
 
 
 class AITaskRequest(AliasedModel):
@@ -39,10 +45,25 @@ class AIProviderSelection(AliasedModel):
     reason: str
 
 
+class DetectedPosition(AliasedModel):
+    x: float
+    y: float
+    z: float
+
+
+class DetectedObject(AliasedModel):
+    label: str
+    object_type: str = Field(alias="objectType")
+    confidence: float = Field(ge=0.0, le=1.0)
+    description: str = ""
+    suggested_position: DetectedPosition | None = Field(default=None, alias="suggestedPosition")
+
+
 class AITaskOutput(AliasedModel):
     summary: str
     structured_data: dict[str, Any] = Field(default_factory=dict, alias="structuredData")
     warnings: list[str] = Field(default_factory=list)
+    detected_objects: list[DetectedObject] = Field(default_factory=list, alias="detectedObjects")
 
 
 class AITaskResponse(AliasedModel):

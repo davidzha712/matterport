@@ -1,192 +1,117 @@
 import Link from "next/link"
-import { ProjectOverviewCard } from "@/components/project-overview-card"
-import { getRuntimeProjects, getRuntimeReviewQueue } from "@/lib/platform-service"
-import { getRuntimeProviderProfiles } from "@/lib/provider-service"
-import { toDisplayDisposition, toDisplayPriority, toDisplayWorkflowStatus, toToneToken } from "@/lib/presentation"
-import { buildObjectRoute, buildSpaceRoute } from "@/lib/routes"
+import { getRuntimeProjects } from "@/lib/platform-service"
+import { buildSpaceRoute } from "@/lib/routes"
+import { getMatterportEmbedUrl } from "@/lib/matterport"
+import { LocaleSwitcher } from "@/components/locale-switcher"
 
 export default async function HomePage() {
-  const [projects, providers, reviewQueue] = await Promise.all([
-    getRuntimeProjects(),
-    getRuntimeProviderProfiles(),
-    getRuntimeReviewQueue()
-  ])
-  const featuredSpace = projects[0]?.spaces[0]
-  const totalSpaces = projects.reduce((total, project) => total + project.spaces.length, 0)
-  const totalObjects = projects.reduce(
-    (projectTotal, project) =>
-      projectTotal + project.spaces.reduce((spaceTotal, space) => spaceTotal + space.objects.length, 0),
-    0
-  )
+  const projects = await getRuntimeProjects()
+  const allSpaces = projects.flatMap((p) => p.spaces)
+  const featuredSpace = allSpaces.find((s) => s.matterportModelSid) ?? allSpaces[0]
 
   return (
-    <main className="home-shell" id="main-content">
-      <section className="hero-panel hero-panel--immersive">
-        <div className="hero-panel__veil" aria-hidden="true" />
-        <div className="hero-copy">
-          <p className="eyebrow">Primaersprache Deutsch, Englisch folgt</p>
-          <h1>Immersive Wissensraeume fuer Nachlaesse und Sammlungen.</h1>
-          <h2 className="hero-copy__headline">
-            Matterport wird zur Buehne, KI zur Wissens- und Workflow-Schicht.
-          </h2>
-          <p className="hero-copy__body">
-            Das hier ist keine gewoehnliche Projektseite. Es ist eine wiederverwendbare immersive
-            Plattform: Matterport als raeumliche Buehne, strukturierte Objektidentitaet als
-            Wissensschicht und geroutete multimodale KI als operativer Copilot.
-          </p>
-          <div className="hero-actions">
+    <main className="landing" id="main-content">
+      {/* Full-screen hero with Matterport embed background */}
+      <section className="landing__hero">
+        {featuredSpace?.matterportModelSid ? (
+          <iframe
+            allow="fullscreen; xr-spatial-tracking"
+            className="landing__hero-embed"
+            loading="eager"
+            referrerPolicy="strict-origin-when-cross-origin"
+            src={getMatterportEmbedUrl(featuredSpace.matterportModelSid)}
+            title={featuredSpace.name}
+          />
+        ) : (
+          <div className="landing__hero-visual" />
+        )}
+        <div className="landing__hero-veil" aria-hidden="true" />
+
+        <header className="landing__topbar">
+          <span className="landing__logo">Matterport</span>
+          <nav className="landing__nav">
             {featuredSpace ? (
-              <Link className="button button--primary" href={buildSpaceRoute(featuredSpace.id)}>
-                Live-Space betreten
+              <Link className="landing__nav-link" href={buildSpaceRoute(featuredSpace.id)}>
+                Explore
               </Link>
             ) : null}
-            <Link className="button button--secondary" href="/review-center">
-              Review Center
+            <Link className="landing__nav-link" href="/studio">
+              Studio
             </Link>
-            <Link className="button button--secondary" href="/settings/providers">
-              Provider-Konfiguration pruefen
-            </Link>
-          </div>
-          <div className="entry-matrix" aria-label="Primaere Plattformzugriffe">
-            <article className="entry-card">
-              <p className="eyebrow">Explorer</p>
-              <h3>Full-screen Space Explorer</h3>
-              <p>Raeumliche Orientierung mit rechter Wissensschicht und unterer Modusnavigation.</p>
-            </article>
-            <article className="entry-card">
-              <p className="eyebrow">Objektebene</p>
-              <h3>Dossiers statt Hotspots</h3>
-              <p>Jedes Objekt bekommt Status, Story, Notizen, Provenienz und spaetere IIIF-Layer.</p>
-            </article>
-            <article className="entry-card">
-              <p className="eyebrow">Workflow</p>
-              <h3>Review first</h3>
-              <p>Menschliche Freigaben bleiben verbindlich, KI liefert nur analysierbare Vorschlaege.</p>
-            </article>
-          </div>
-        </div>
-        <div className="hero-sidebar" aria-label="Plattformstatus">
-          <div className="hero-metrics hero-metrics--stacked">
-            <div className="metric-card">
-              <span>Projekte</span>
-              <strong>{projects.length}</strong>
-            </div>
-            <div className="metric-card">
-              <span>Spaces</span>
-              <strong>{totalSpaces}</strong>
-            </div>
-            <div className="metric-card">
-              <span>Review Queue</span>
-              <strong>{reviewQueue.length}</strong>
-            </div>
-            <div className="metric-card metric-card--wide">
-              <span>Objekte</span>
-              <strong>{totalObjects}</strong>
-              <p>Review-first modelliert, mehrprojektfaehig und spaeter exportierbar.</p>
-            </div>
-          </div>
+            <LocaleSwitcher />
+          </nav>
+        </header>
 
+        <div className="landing__hero-content">
+          <p className="landing__eyebrow">Immersive Digital Twin</p>
+          <h1 className="landing__headline">
+            Raeume werden zu Wissensbuehnen.
+          </h1>
+          <p className="landing__subline">
+            Begehbare 3D-Raeume mit KI-gestuetzter Objekterkennung und Nachlassverwaltung.
+          </p>
           {featuredSpace ? (
-            <div className="hero-preview">
-              <div className="hero-preview__header">
-                <div>
-                  <p className="eyebrow">Aktive Buehne</p>
-                  <h3>{featuredSpace.name}</h3>
-                </div>
-                <span className="pill pill--active">Matterport live</span>
-              </div>
-              <p>{featuredSpace.summary}</p>
-              <ul className="hero-preview__chips">
-                <li>Erkunden</li>
-                <li>Story</li>
-                <li>Pruefen</li>
-                <li>Listing</li>
-              </ul>
-              <ul className="hero-preview__facts">
-                {featuredSpace.rooms.slice(0, 3).map((room) => (
-                  <li key={room.id}>
-                    <strong>{room.name}</strong>
-                    <span>{room.objectIds.length} Objekte</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <Link className="landing__cta" href={buildSpaceRoute(featuredSpace.id)}>
+              Space betreten
+            </Link>
           ) : null}
         </div>
-      </section>
 
-      <section className="section-grid">
-        <div className="section-card">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Portfolio</p>
-              <h2>Projektlandschaft</h2>
-            </div>
-            <p>
-              Jedes Projekt kann mehrere Matterport-Spaces, Objektlagen, Review-Regeln und
-              Erzaehlpfade fuehren.
-            </p>
-          </div>
-          <div className="project-grid">
-            {projects.map((project) => (
-              <ProjectOverviewCard key={project.id} project={project} />
-            ))}
-          </div>
+        <div className="landing__scroll-hint" aria-hidden="true">
+          <span>Scroll</span>
+          <div className="landing__scroll-line" />
         </div>
-
-        <aside className="section-card section-card--narrow">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Review Center</p>
-              <h2>Offene Entscheidungen</h2>
-            </div>
-            <p>Menschen pruefen, Modelle beschleunigen. Diese Liste kommt jetzt aus dem Backend.</p>
-          </div>
-          <ul className="review-queue-list" aria-label="Pending review items">
-            {reviewQueue.slice(0, 4).map((item) => (
-              <li key={item.objectId}>
-                <Link href={buildObjectRoute(item.spaceId, item.objectId)}>
-                  <div>
-                    <strong>{item.objectTitle}</strong>
-                    <p>
-                      {item.projectName} · {item.spaceName} · {item.roomName}
-                    </p>
-                  </div>
-                  <div className="review-queue-list__meta">
-                    <span className="pill pill--needs-review">{toDisplayWorkflowStatus(item.status)}</span>
-                    <small>
-                      {toDisplayPriority(item.priorityBand)} · {toDisplayDisposition(item.disposition)}
-                    </small>
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
-          <div className="section-heading section-heading--compact">
-            <div>
-              <p className="eyebrow">Routing</p>
-              <h2>Modellpolitik</h2>
-            </div>
-            <p>Provider bleiben serverseitig; die UI zeigt nur Status und Einsatzklasse.</p>
-          </div>
-          <ul className="provider-list" aria-label="Configured providers">
-            {providers.map((provider) => (
-              <li key={provider.id} className="provider-list__item">
-                <div>
-                  <strong>{provider.label}</strong>
-                  <p>{provider.specialty}</p>
-                </div>
-                <div className="provider-list__meta">
-                  <span className={`pill pill--${toToneToken(provider.status)}`}>
-                    {toDisplayWorkflowStatus(provider.status)}
-                  </span>
-                  <small>{provider.configured ? "Verbunden" : "Noch nicht hinterlegt"}</small>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </aside>
       </section>
+
+      {/* Space gallery */}
+      {allSpaces.length > 0 ? (
+        <section className="landing__gallery">
+          <h2 className="landing__section-title">Digitale Raeume</h2>
+          <div className="landing__grid">
+            {allSpaces.map((space) => (
+              <Link
+                className="space-card"
+                href={buildSpaceRoute(space.id)}
+                key={space.id}
+              >
+                <div className="space-card__visual">
+                  {space.matterportModelSid ? (
+                    <iframe
+                      className="space-card__embed"
+                      loading="lazy"
+                      referrerPolicy="strict-origin-when-cross-origin"
+                      src={`https://my.matterport.com/show/?m=${space.matterportModelSid}&play=1&qs=1&brand=0&title=0&help=0&gt=0&hr=0&mls=2&mt=0`}
+                      title={space.name}
+                    />
+                  ) : (
+                    <div className="space-card__placeholder" />
+                  )}
+                  <div className="space-card__overlay" />
+                </div>
+                <div className="space-card__info">
+                  <span className="space-card__project">{space.projectName}</span>
+                  <h3 className="space-card__title">{space.name}</h3>
+                  <p className="space-card__summary">{space.summary}</p>
+                  <div className="space-card__meta">
+                    <span>{space.rooms.length} Raeume</span>
+                    <span>{space.objects.length} Objekte</span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {/* Minimal footer */}
+      <footer className="landing__footer">
+        <span>Matterport Immersive Platform</span>
+        <div className="landing__footer-links">
+          <Link href="/studio">Studio</Link>
+          <Link href="/review-center">Review</Link>
+          <Link href="/export-center">Export</Link>
+        </div>
+      </footer>
     </main>
   )
 }

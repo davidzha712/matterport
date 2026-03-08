@@ -1,4 +1,6 @@
 from fastapi.testclient import TestClient
+
+from app.repository import get_space
 from app.main import app
 
 client = TestClient(app)
@@ -32,3 +34,17 @@ def test_export_space_csv():
 def test_export_invalid_space_csv():
     response = client.get("/api/v1/export/spaces/non-existent/csv")
     assert response.status_code == 404
+
+
+def test_export_escapes_formula_like_cells():
+    space = get_space("orchard-main-house")
+    assert space is not None
+    original_title = space.objects[0].title
+    space.objects[0].title = "=cmd|' /C calc'!A0"
+
+    try:
+        response = client.get("/api/v1/export/spaces/orchard-main-house/csv")
+        assert response.status_code == 200
+        assert "'=cmd|' /C calc'!A0" in response.text
+    finally:
+        space.objects[0].title = original_title

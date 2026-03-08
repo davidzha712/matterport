@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Literal
+from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -136,10 +137,13 @@ class AuditEvent(AliasedModel):
 
 
 class ObjectWorkflowUpdateRequest(AliasedModel):
+    ai_summary: str | None = Field(default=None, alias="aiSummary", max_length=4000)
     disposition: Disposition | None = None
     note: str | None = Field(default=None, max_length=500)
     reviewer: str = Field(default="curatorial-operator", min_length=2, max_length=80)
     status: ObjectStatus | None = None
+    title: str | None = Field(default=None, min_length=1, max_length=180)
+    type: str | None = Field(default=None, min_length=1, max_length=120)
 
 
 class ObjectWorkflowUpdateResponse(AliasedModel):
@@ -178,3 +182,41 @@ class RoomListResponse(BaseModel):
 
 class ObjectListResponse(BaseModel):
     items: list[ObjectRecord]
+
+
+class AnnotationPosition(AliasedModel):
+    x: float
+    y: float
+    z: float
+
+
+class SpatialAnnotation(AliasedModel):
+    annotation_id: str = Field(default_factory=lambda: f"ann_{uuid4().hex[:12]}", alias="annotationId")
+    space_id: str = Field(alias="spaceId")
+    room_id: str | None = Field(default=None, alias="roomId")
+    object_id: str | None = Field(default=None, alias="objectId")
+    label: str = Field(min_length=1, max_length=200)
+    description: str = Field(default="", max_length=2000)
+    position: AnnotationPosition
+    color: str | None = Field(default=None, max_length=20)
+    created_by: Literal["ai", "manual"] = Field(alias="createdBy")
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+
+
+class AnnotationCreateRequest(AliasedModel):
+    label: str = Field(min_length=1, max_length=200)
+    description: str = Field(default="", max_length=2000)
+    position: AnnotationPosition
+    room_id: str | None = Field(default=None, alias="roomId")
+    object_id: str | None = Field(default=None, alias="objectId")
+    color: str | None = Field(default=None, max_length=20)
+    created_by: Literal["ai", "manual"] = Field(default="manual", alias="createdBy")
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+
+
+class AnnotationUpdateRequest(AliasedModel):
+    label: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=2000)
+    position: AnnotationPosition | None = None
+    color: str | None = Field(default=None, max_length=20)
+    object_id: str | None = Field(default=None, alias="objectId")

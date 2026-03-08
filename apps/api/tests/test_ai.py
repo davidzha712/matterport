@@ -1,7 +1,10 @@
 from fastapi.testclient import TestClient
 
 import app.settings as settings
-from app.ai.providers.minimax import MiniMaxAdapter, ProviderInvocationError
+from app.ai.errors import ProviderInvocationError, TaskInputValidationError
+from app.ai.providers.kimi import KimiAdapter
+from app.ai.providers.minimax import MiniMaxAdapter
+from app.ai.providers.openai import OpenAIAdapter
 from app.ai.schemas import AITaskOutput, AITaskRequest
 from app.main import app
 
@@ -73,6 +76,66 @@ def test_ai_task_routes_vision_detect_to_minimax_without_leaking_secret(monkeypa
     assert payload["output"]["structuredData"]["spaceId"] == "museum-east-hall"
     assert payload["output"]["structuredData"]["deliveryMode"] == "native-vlm"
     assert secret not in response.text
+
+
+def test_ai_task_prefers_kimi_for_narrative_when_configured(monkeypatch) -> None:
+    _clear_ai_provider_env(monkeypatch)
+    monkeypatch.setattr(
+        settings,
+        "_read_local_env",
+        lambda: {"KIMI_API_KEY": "secret-kimi-token", "OPENAI_API_KEY": "secret-openai-token"},
+    )
+    monkeypatch.setattr(
+        KimiAdapter,
+        "_invoke_text_task",
+        lambda self, task: "Kimi narrative summary.",
+    )
+
+    response = client.post(
+        "/api/v1/ai/tasks",
+        json={
+            "taskType": "narrative-summarize",
+            "input": {
+                "prompt": "Schreibe eine hochwertige Zusammenfassung dieses Raums.",
+                "spaceId": "museum-east-hall",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["provider"]["providerId"] == "kimi"
+    assert payload["output"]["summary"] == "Kimi narrative summary."
+
+
+def test_ai_task_prefers_openai_for_workflow_when_multiple_providers_are_configured(monkeypatch) -> None:
+    _clear_ai_provider_env(monkeypatch)
+    monkeypatch.setattr(
+        settings,
+        "_read_local_env",
+        lambda: {"OPENAI_API_KEY": "secret-openai-token", "MINIMAX_API_KEY": "secret-minimax-token"},
+    )
+    monkeypatch.setattr(
+        OpenAIAdapter,
+        "_invoke_text_task",
+        lambda self, task: "OpenAI workflow plan.",
+    )
+
+    response = client.post(
+        "/api/v1/ai/tasks",
+        json={
+            "taskType": "workflow-assist",
+            "input": {
+                "prompt": "Erstelle einen sicheren Review-Ablauf fuer diesen Raum.",
+                "spaceId": "museum-east-hall",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["provider"]["providerId"] == "openai"
+    assert payload["output"]["summary"] == "OpenAI workflow plan."
 
 
 def test_ai_task_invokes_minimax_runtime_for_narrative_summarize(monkeypatch) -> None:
@@ -199,3 +262,23 @@ def test_ai_task_returns_422_when_vision_detect_has_no_image_attachment(monkeypa
     assert response.json() == {
         "detail": "Vision tasks require at least one image attachment as an upload or HTTPS image URL."
     }
+
+
+def test_openai_adapter_rejects_private_remote_image_hosts() -> None:
+    adapter = OpenAIAdapter(api_key="secret-openai-token")
+    task = AITaskRequest.model_validate(
+        {
+            "taskType": "vision-detect",
+            "input": {
+                "prompt": "Analysiere dieses Objektbild.",
+                "attachments": [{"kind": "image", "url": "https://127.0.0.1/frame.jpg"}],
+            },
+        }
+    )
+
+    try:
+        adapter.run(task)
+    except TaskInputValidationError as exc:
+        assert str(exc) == "Remote image attachments must resolve to public internet hosts."
+    else:
+        raise AssertionError("Expected TaskInputValidationError for private image host.")

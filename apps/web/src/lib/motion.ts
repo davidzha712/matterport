@@ -1,0 +1,9 @@
+export const springStiff = { type: "spring" as const, stiffness: 400, damping: 30 }
+export const springGentle = { type: "spring" as const, stiffness: 260, damping: 26 }
+export const springBounce = { type: "spring" as const, stiffness: 300, damping: 20 }
+export const fadeIn = { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 } }
+export const slideUp = { initial: { opacity: 0, y: 16 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: 16 } }
+export const slideDown = { initial: { opacity: 0, y: -16 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -16 } }
+export const slideLeft = { initial: { opacity: 0, x: -24 }, animate: { opacity: 1, x: 0 }, exit: { opacity: 0, x: -24 } }
+export const slideRight = { initial: { opacity: 0, x: 24 }, animate: { opacity: 1, x: 0 }, exit: { opacity: 0, x: 24 } }
+export const scaleIn = { initial: { opacity: 0, scale: 0.95 }, animate: { opacity: 1, scale: 1 }, exit: { opacity: 0, scale: 0.95 } }
