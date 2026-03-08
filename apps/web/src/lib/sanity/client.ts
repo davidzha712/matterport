@@ -11,11 +11,13 @@ export function isSanityConfigured() {
   return Boolean(projectId && dataset)
 }
 
-export const sanityClient = createClient({
-  apiVersion,
-  dataset,
-  perspective: "published",
-  projectId: projectId || "placeholder",
-  token: readToken,
-  useCdn: false
-})
+export const sanityClient = isSanityConfigured()
+  ? createClient({
+      apiVersion,
+      dataset,
+      perspective: "published",
+      projectId,
+      token: readToken,
+      useCdn: false
+    })
+  : (null as unknown as ReturnType<typeof createClient>)
