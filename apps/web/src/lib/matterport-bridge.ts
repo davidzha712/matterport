@@ -854,18 +854,28 @@ export class MatterportBridge {
     const dirZ = -Math.cos(yaw) * sign
 
     const current = this._currentSweep
+    const currentFloorSeq = current.floorInfo?.sequence
+
+    // STRICTLY use neighbor graph — only physically connected sweeps
     const candidates = current.neighbors
       .map((sid) => this._sweeps.find((s) => s.sid === sid))
-      .filter(
-        (s): s is SweepData => s != null && s.enabled
-      )
+      .filter((s): s is SweepData => {
+        if (s == null || !s.enabled) return false
+        // Floor check: never navigate to a different floor via WASD
+        if (currentFloorSeq != null && s.floorInfo?.sequence != null) {
+          if (s.floorInfo.sequence !== currentFloorSeq) return false
+        }
+        return true
+      })
 
     if (candidates.length === 0) {
       return false
     }
 
-    let best: SweepData = candidates[0]
-    let bestDot = -Infinity
+    // Separate candidates: same room vs cross-room (doorway transitions)
+    const currentRoomId = current.room
+    const sameRoom: Array<{ sweep: SweepData; score: number }> = []
+    const crossRoom: Array<{ sweep: SweepData; score: number }> = []
 
     for (const sweep of candidates) {
       const dx = sweep.position.x - current.position.x
@@ -874,13 +884,71 @@ export class MatterportBridge {
       if (dist < 0.01) continue
 
       const dot = (dx / dist) * dirX + (dz / dist) * dirZ
-      if (dot > bestDot) {
-        bestDot = dot
-        best = sweep
+
+      // Reject sweeps behind the camera (dot <= 0 means wrong direction)
+      if (dot <= 0) continue
+
+      // Score: direction alignment weighted by proximity (closer = better)
+      const proximityBonus = 1 / (1 + dist)
+      const score = dot * (1 + proximityBonus * 0.3)
+
+      // Room boundary check: verify the midpoint lies within a known room
+      if (!this.isPathClearOfWalls(current.position, sweep.position)) continue
+
+      const bucket =
+        currentRoomId != null && sweep.room === currentRoomId
+          ? sameRoom
+          : crossRoom
+      bucket.push({ sweep, score })
+    }
+
+    // Prefer same-room sweeps; fall back to cross-room (doorway) only if
+    // no same-room candidate aligns with the desired direction
+    const pool = sameRoom.length > 0 ? sameRoom : crossRoom
+    if (pool.length === 0) {
+      return false
+    }
+
+    // Pick highest-scoring candidate
+    let best = pool[0]
+    for (let i = 1; i < pool.length; i++) {
+      if (pool[i].score > best.score) {
+        best = pool[i]
       }
     }
 
-    return this.navigateToSweep(best.sid, { transition: "fly" })
+    return this.navigateToSweep(best.sweep.sid, { transition: "fly" })
+  }
+
+  /**
+   * Check whether the straight-line path between two positions crosses a
+   * room boundary wall. Uses room AABB bounds as a rough spatial partition.
+   *
+   * Heuristic: the midpoint of the path should lie within the bounds of at
+   * least one known room. If it falls outside all rooms, the path likely
+   * crosses a wall.
+   */
+  private isPathClearOfWalls(from: Vector3, to: Vector3): boolean {
+    if (this._rooms.length === 0) {
+      // No room data loaded yet — allow navigation (graceful fallback)
+      return true
+    }
+
+    const mid: Vector3 = {
+      x: (from.x + to.x) / 2,
+      y: (from.y + to.y) / 2,
+      z: (from.z + to.z) / 2,
+    }
+
+    return this._rooms.some(
+      (room) =>
+        mid.x >= room.bounds.min.x &&
+        mid.x <= room.bounds.max.x &&
+        mid.y >= room.bounds.min.y &&
+        mid.y <= room.bounds.max.y &&
+        mid.z >= room.bounds.min.z &&
+        mid.z <= room.bounds.max.z
+    )
   }
 
   // -----------------------------------------------------------------------

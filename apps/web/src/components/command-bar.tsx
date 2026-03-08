@@ -5,7 +5,7 @@ import { useCallback, useDeferredValue, useEffect, useState, useTransition } fro
 import { getBrowserApiBaseUrl } from "@/lib/browser-api"
 import { useT } from "@/lib/i18n"
 import { useVoiceInput } from "@/lib/use-voice-input"
-import type { RoomRecord, SpaceRecord } from "@/lib/mock-data"
+import type { RoomRecord, SpaceRecord } from "@/lib/platform-types"
 
 type TaskType = "vision-detect" | "narrative-summarize" | "workflow-assist"
 
@@ -85,7 +85,7 @@ export function CommandBar({ room, space }: CommandBarProps) {
       const detail = (event as CustomEvent<{ dataUrl: string }>).detail
       if (!detail?.dataUrl) return
       setImageAttachment({
-        label: "SDK Screenshot",
+        label: t.ai.sdkScreenshot,
         origin: "sdk-capture",
         previewUrl: detail.dataUrl,
         url: detail.dataUrl
@@ -104,7 +104,7 @@ export function CommandBar({ room, space }: CommandBarProps) {
     imageAttachment ??
     (imageUrl.trim()
       ? {
-          label: "Externe Bild-URL",
+          label: t.ai.externalImageUrl,
           origin: "remote-url" as const,
           previewUrl: imageUrl.trim(),
           url: imageUrl.trim()
@@ -125,12 +125,12 @@ export function CommandBar({ room, space }: CommandBarProps) {
     if (!file) return
 
     if (!acceptedImageTypes.has(file.type)) {
-      setError("Bitte waehle ein JPEG-, PNG- oder WebP-Bild.")
+      setError(t.ai.imageTypeError)
       return
     }
 
     if (file.size > maxImageBytes) {
-      setError("Bilder duerfen hoechstens 8 MB gross sein.")
+      setError(t.ai.imageSizeError)
       return
     }
 
@@ -148,7 +148,7 @@ export function CommandBar({ room, space }: CommandBarProps) {
       })
     } catch {
       setImageAttachment(null)
-      setError("Das Bild konnte nicht gelesen werden.")
+      setError(t.ai.imageReadError)
     } finally {
       setIsReadingImage(false)
     }
@@ -193,7 +193,7 @@ export function CommandBar({ room, space }: CommandBarProps) {
 
           if (!response.ok) {
             const payload = (await response.json().catch(() => null)) as { detail?: string } | null
-            throw new Error(payload?.detail ?? "Der KI-Dienst ist momentan nicht erreichbar.")
+            throw new Error(payload?.detail ?? t.ai.serviceUnavailable)
           }
 
           const payload = (await response.json()) as AIResponse
@@ -219,7 +219,7 @@ export function CommandBar({ room, space }: CommandBarProps) {
           })
         } catch (caughtError) {
           const message =
-            caughtError instanceof Error ? caughtError.message : "Die Analyse konnte nicht gestartet werden."
+            caughtError instanceof Error ? caughtError.message : t.ai.analysisError
           startTransition(() => {
             setError(message)
             setResult(null)
@@ -229,7 +229,7 @@ export function CommandBar({ room, space }: CommandBarProps) {
         }
       })()
     },
-    [activeAttachment, command, room, space, taskType]
+    [activeAttachment, command, room, space, taskType, t]
   )
 
   return (
@@ -317,7 +317,7 @@ export function CommandBar({ room, space }: CommandBarProps) {
                 {isReadingImage ? t.common.loading : t.common.add}
               </label>
               <span className="command-bar__attachment-divider" aria-hidden="true">
-                oder
+                {t.ai.orDivider}
               </span>
               <label className="sr-only" htmlFor="command-bar-image-url">
                 URL
@@ -327,7 +327,7 @@ export function CommandBar({ room, space }: CommandBarProps) {
                 id="command-bar-image-url"
                 inputMode="url"
                 onChange={(event) => handleImageUrlChange(event.target.value)}
-                placeholder="https://… oder Upload / SDK Screenshot"
+                placeholder={t.ai.urlPlaceholder}
                 spellCheck={false}
                 type="url"
                 value={imageUrl}
@@ -344,10 +344,10 @@ export function CommandBar({ room, space }: CommandBarProps) {
                   <strong>{truncateLabel(activeAttachment.label)}</strong>
                   <span>
                     {activeAttachment.origin === "sdk-capture"
-                      ? "SDK Screenshot"
+                      ? t.ai.sdkScreenshot
                       : activeAttachment.origin === "inline-upload"
-                        ? "Upload"
-                        : "URL"}
+                        ? t.ai.uploadLabel
+                        : t.ai.urlLabel}
                   </span>
                 </div>
                 <button
@@ -360,8 +360,7 @@ export function CommandBar({ room, space }: CommandBarProps) {
               </div>
             ) : (
               <p className="command-bar__attachment-note">
-                Fuer die visuelle Analyse wird mindestens ein Bild benoetigt.
-                SDK Screenshot oder Upload.
+                {t.ai.imageRequired}
               </p>
             )}
           </div>
@@ -397,7 +396,7 @@ export function CommandBar({ room, space }: CommandBarProps) {
               <p>{result.output.summary}</p>
               <ul className="command-brief__facts">
                 <li>Provider: {result.provider.providerId}</li>
-                <li>{t.providers.connected}: {result.provider.configured ? "Ja" : "Nein"}</li>
+                <li>{t.providers.connected}: {result.provider.configured ? t.common.success : t.common.error}</li>
                 <li>Task: {result.taskType}</li>
               </ul>
               {result.output.warnings.length ? (

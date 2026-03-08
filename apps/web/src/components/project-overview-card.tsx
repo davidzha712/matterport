@@ -1,5 +1,5 @@
 import Link from "next/link"
-import type { ProjectRecord } from "@/lib/mock-data"
+import type { ProjectRecord } from "@/lib/platform-types"
 import { toDisplayVertical, toDisplayWorkflowStatus, toToneToken } from "@/lib/presentation"
 import { buildSpaceRoute } from "@/lib/routes"
 

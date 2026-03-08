@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { getBrowserApiBaseUrl } from "@/lib/browser-api"
-import type { ProviderProfile } from "@/lib/mock-data"
+import type { ProviderProfile } from "@/lib/platform-types"
 import { toDisplayDisposition, toDisplayObjectStatus, toDisplayPriority } from "@/lib/presentation"
 
 type ReviewQueueItem = {

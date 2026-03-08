@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { useBridge } from "@/lib/bridge-context"
 import { useT } from "@/lib/i18n"
 import type { UserRole } from "@/lib/use-immersive-mode"
-import type { ObjectRecord, RoomRecord, SpaceRecord } from "@/lib/mock-data"
+import type { ObjectRecord, RoomRecord, SpaceRecord } from "@/lib/platform-types"
 
 type InteractionDialogProps = {
   objects: ObjectRecord[]

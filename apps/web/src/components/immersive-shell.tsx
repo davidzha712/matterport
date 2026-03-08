@@ -13,7 +13,7 @@ import { LocaleSwitcher } from "@/components/locale-switcher"
 import { BridgeProvider, useBridge } from "@/lib/bridge-context"
 import { useT } from "@/lib/i18n"
 import { useImmersiveMode } from "@/lib/use-immersive-mode"
-import type { ObjectRecord, ProviderProfile, RoomRecord, SpaceRecord } from "@/lib/mock-data"
+import type { ObjectRecord, ProviderProfile, RoomRecord, SpaceRecord } from "@/lib/platform-types"
 import { buildSpaceRoute } from "@/lib/routes"
 import { stageModeLabels, type StageMode } from "@/lib/routes"
 

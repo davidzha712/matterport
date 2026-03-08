@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 import { getBrowserApiBaseUrl } from "@/lib/browser-api"
-import type { ObjectRecord } from "@/lib/mock-data"
+import type { ObjectRecord } from "@/lib/platform-types"
 import { toDisplayDisposition, toDisplayObjectStatus, toToneToken } from "@/lib/presentation"
 
 type WorkflowUpdateResponse = {

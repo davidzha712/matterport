@@ -8,6 +8,12 @@ import type {
   RoomRecord,
   SpaceRecord,
 } from "@/lib/platform-types"
+import {
+  getProjects as getMockProjects,
+  getProviderProfiles as getMockProviders,
+  getReviewQueue as getMockReviewQueue,
+  getSpaceById as getMockSpace,
+} from "@/lib/mock-data"
 import { isSanityConfigured, sanityClient } from "@/lib/sanity/client"
 import {
   mapSnapshotToProjects,
@@ -31,17 +37,20 @@ const getSanitySnapshot = cache(async (): Promise<SanitySnapshot | null> => {
 
 export async function getRuntimeProjects(): Promise<ProjectRecord[]> {
   const snapshot = await getSanitySnapshot()
-  return snapshot ? mapSnapshotToProjects(snapshot) : []
+  const projects = snapshot ? mapSnapshotToProjects(snapshot) : []
+  return projects.length > 0 ? projects : getMockProjects()
 }
 
 export async function getRuntimeSpace(spaceId: string): Promise<SpaceRecord | undefined> {
   const snapshot = await getSanitySnapshot()
-  return snapshot ? mapSnapshotToSpace(snapshot, spaceId) : undefined
+  const space = snapshot ? mapSnapshotToSpace(snapshot, spaceId) : undefined
+  return space ?? getMockSpace(spaceId)
 }
 
 export async function getRuntimeReviewQueue(): Promise<ReviewQueueItem[]> {
   const snapshot = await getSanitySnapshot()
-  return snapshot ? mapSnapshotToReviewQueue(snapshot) : []
+  const queue = snapshot ? mapSnapshotToReviewQueue(snapshot) : []
+  return queue.length > 0 ? queue : getMockReviewQueue()
 }
 
 export async function getRuntimeObject(spaceId: string, objectId: string): Promise<{

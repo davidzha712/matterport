@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback } from "react"
-import type { SpaceRecord } from "@/lib/mock-data"
+import type { SpaceRecord } from "@/lib/platform-types"
 import { getMatterportEmbedStatus, getMatterportEmbedUrl } from "@/lib/matterport"
 import { useBridge } from "@/lib/bridge-context"
 import { useT } from "@/lib/i18n"

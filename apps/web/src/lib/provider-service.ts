@@ -56,7 +56,9 @@ export async function getRuntimeProviderProfiles(): Promise<ProviderProfile[]> {
     : []
 
   if (providerProfiles.length === 0) {
-    return []
+    // Fallback to mock data when Sanity has no provider profiles
+    const { getProviderProfiles } = await import("@/lib/mock-data")
+    return getProviderProfiles()
   }
 
   const configuredState = await getBackendProviderConfiguration()

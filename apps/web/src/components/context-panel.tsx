@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useCallback } from "react"
-import type { ObjectRecord, ProviderProfile, RoomRecord, SpaceRecord } from "@/lib/mock-data"
+import type { ObjectRecord, ProviderProfile, RoomRecord, SpaceRecord } from "@/lib/platform-types"
 import { ObjectWorkflowCard } from "@/components/object-workflow-card"
 import { WorkflowSidebar } from "@/components/workflow-sidebar"
 import { useBridge } from "@/lib/bridge-context"
