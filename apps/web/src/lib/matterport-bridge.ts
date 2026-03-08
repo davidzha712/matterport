@@ -349,10 +349,23 @@ export class MatterportBridge {
     }
 
     try {
+      // Load the Matterport SDK bundle on the parent page if not already loaded
+      await this.ensureSdkBundle()
+
       const embeddingWindow = window as unknown as ShowcaseEmbedWindow
       if (!embeddingWindow.MP_SDK) {
+        console.warn("Matterport MP_SDK not available after loading bundle")
         return
       }
+
+      // Wait for the iframe to be ready before connecting
+      await new Promise<void>((resolve) => {
+        if (iframe.contentDocument?.readyState === "complete") {
+          resolve()
+        } else {
+          iframe.addEventListener("load", () => resolve(), { once: true })
+        }
+      })
 
       const mpSdk = await embeddingWindow.MP_SDK.connect(iframe, sdkKey)
       this.sdk = mpSdk
@@ -364,6 +377,19 @@ export class MatterportBridge {
       // SDK connection failed — stay in iframe-only mode
       console.error("Matterport SDK connection failed:", error)
     }
+  }
+
+  private async ensureSdkBundle(): Promise<void> {
+    const w = window as unknown as ShowcaseEmbedWindow
+    if (w.MP_SDK) return
+
+    return new Promise<void>((resolve, reject) => {
+      const script = document.createElement("script")
+      script.src = "https://static.matterport.com/showcase-sdk/latest.js"
+      script.onload = () => resolve()
+      script.onerror = () => reject(new Error("Failed to load Matterport SDK bundle"))
+      document.head.appendChild(script)
+    })
   }
 
   detach(): void {
