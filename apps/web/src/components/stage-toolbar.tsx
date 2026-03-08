@@ -108,10 +108,6 @@ export function StageToolbar({ bridge, currentRoom }: StageToolbarProps) {
     }
   }, [bridge, t])
 
-  if (!sdkReady) {
-    return null
-  }
-
   return (
     <div className="stage-toolbar">
       <div className="stage-toolbar__group" role="group" aria-label={t.stage.mode}>
@@ -119,6 +115,7 @@ export function StageToolbar({ bridge, currentRoom }: StageToolbarProps) {
           <button
             key={mode}
             className={`stage-toolbar__btn${currentMode === mode ? " stage-toolbar__btn--active" : ""}`}
+            disabled={!sdkReady}
             onClick={() => handleModeSwitch(mode)}
             type="button"
           >
@@ -134,6 +131,7 @@ export function StageToolbar({ bridge, currentRoom }: StageToolbarProps) {
           <>
             <button
               className="stage-toolbar__btn"
+              disabled={!sdkReady}
               onClick={handleTourPrev}
               title={t.tour.prevStop}
               type="button"
@@ -149,6 +147,7 @@ export function StageToolbar({ bridge, currentRoom }: StageToolbarProps) {
             </button>
             <button
               className="stage-toolbar__btn"
+              disabled={!sdkReady}
               onClick={handleTourNext}
               title={t.tour.nextStop}
               type="button"
@@ -159,6 +158,7 @@ export function StageToolbar({ bridge, currentRoom }: StageToolbarProps) {
         ) : (
           <button
             className="stage-toolbar__btn"
+            disabled={!sdkReady}
             onClick={handleTourToggle}
             type="button"
           >
@@ -171,6 +171,7 @@ export function StageToolbar({ bridge, currentRoom }: StageToolbarProps) {
 
       <button
         className="stage-toolbar__btn"
+        disabled={!sdkReady}
         onClick={() => void handleScreenshot()}
         title={t.stage.captureView}
         type="button"
@@ -180,13 +181,20 @@ export function StageToolbar({ bridge, currentRoom }: StageToolbarProps) {
 
       <button
         className="stage-toolbar__btn stage-toolbar__btn--accent"
-        disabled={analysisStatus !== null}
+        disabled={!sdkReady || analysisStatus !== null}
         onClick={() => void handleVisionAnalysis()}
         title={t.ai.detectObjects}
         type="button"
       >
         {analysisStatus ?? t.ai.detectObjects}
       </button>
+
+      {!sdkReady ? (
+        <>
+          <div className="stage-toolbar__divider" aria-hidden="true" />
+          <span className="stage-toolbar__status">SDK: {t.common.loading}</span>
+        </>
+      ) : null}
 
       {roomDimensions ? (
         <>

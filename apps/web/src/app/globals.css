@@ -2036,6 +2036,18 @@ ul {
   opacity: 0.5;
   cursor: wait;
 }
+.stage-toolbar__btn:disabled:not(.stage-toolbar__btn--accent) {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.stage-toolbar__status {
+  padding: 4px 10px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
 
 /* Locale switcher */
 .locale-switcher {
