@@ -17,10 +17,18 @@ type ContextPanelProps = {
 }
 
 export function ContextPanel({ providers, selectedObject, selectedRoom, space }: ContextPanelProps) {
-  const { bridge, status } = useBridge()
+  const { bridge, status, currentRoom: sdkRoom } = useBridge()
   const t = useT()
-  const focalObject = selectedObject ?? space.objects[0]
-  const focalRoom = selectedRoom ?? space.rooms[0]
+
+  // Match SDK room to our data model for reactive room tracking
+  const matchedRoom = sdkRoom
+    ? space.rooms.find((r) =>
+        r.name.toLowerCase() === sdkRoom.name.toLowerCase() ||
+        r.id === sdkRoom.id
+      )
+    : undefined
+  const focalRoom = selectedRoom ?? matchedRoom ?? space.rooms[0]
+  const focalObject = selectedObject ?? space.objects.find((o) => o.roomId === focalRoom.id) ?? space.objects[0]
   const objectRoute = buildObjectRoute(space.id, focalObject.id)
 
   const handleRoomClick = useCallback(

@@ -226,7 +226,7 @@ interface ShowcaseEmbedWindow extends Window {
 
 export type BridgeStatus = "disconnected" | "iframe-only" | "sdk-connected"
 export type ViewMode = "inside" | "dollhouse" | "floorplan"
-export type { PointerIntersection, ModelDetails }
+export type { PointerIntersection, ModelDetails, RoomData, SweepData, FloorData, TagData, TourSnapshot }
 
 type AnnotationListener = (annotations: SpatialAnnotation[]) => void
 type SweepChangeCallback = (sweep: SweepData) => void
@@ -279,6 +279,9 @@ export class MatterportBridge {
   private _sweeps: SweepData[] = []
   private _rooms: RoomData[] = []
   private _floors: FloorData[] = []
+  private _tags: TagData[] = []
+  private _tourSnapshots: TourSnapshot[] = []
+  private _modelDetails: ModelDetails | null = null
 
   // -----------------------------------------------------------------------
   // Getters
@@ -318,6 +321,18 @@ export class MatterportBridge {
 
   get currentFloor(): { id: string; sequence: number } | undefined {
     return this._currentFloor
+  }
+
+  get tags(): ReadonlyArray<TagData> {
+    return this._tags
+  }
+
+  get tourSnapshots(): ReadonlyArray<TourSnapshot> {
+    return this._tourSnapshots
+  }
+
+  get modelDetails(): ModelDetails | null {
+    return this._modelDetails
   }
 
   // -----------------------------------------------------------------------
@@ -787,6 +802,40 @@ export class MatterportBridge {
   }
 
   // -----------------------------------------------------------------------
+  // Tag creation at pointer position (for interactive labeling)
+  // -----------------------------------------------------------------------
+
+  async addTagAtCurrentView(
+    label: string,
+    description: string,
+    color?: { r: number; g: number; b: number }
+  ): Promise<string | null> {
+    if (!this.sdk || !this._lastPose) {
+      return null
+    }
+
+    // Place the tag at the current camera's target point
+    // Offset slightly forward from camera position in view direction
+    const yaw = (this._lastPose.rotation.x * Math.PI) / 180
+    const pitch = (this._lastPose.rotation.y * Math.PI) / 180
+    const distance = 1.5
+
+    const anchorPosition = {
+      x: this._lastPose.position.x + Math.sin(yaw) * Math.cos(pitch) * distance,
+      y: this._lastPose.position.y + Math.sin(pitch) * distance,
+      z: this._lastPose.position.z - Math.cos(yaw) * Math.cos(pitch) * distance,
+    }
+
+    return this.addTag({
+      label,
+      description,
+      anchorPosition,
+      stemVector: { x: 0, y: 0.2, z: 0 },
+      color,
+    })
+  }
+
+  // -----------------------------------------------------------------------
   // Directional navigation (WASD FPS-style)
   // -----------------------------------------------------------------------
 
@@ -1235,6 +1284,32 @@ export class MatterportBridge {
     } catch (error) {
       console.error("Failed to load floor data:", error)
       this._floors = []
+    }
+
+    // Load tags via collection observable
+    const tagSub = sdk.Tag.data.subscribe({
+      onCollectionUpdated: (collection) => {
+        if (collection instanceof Map) {
+          this._tags = Array.from(collection.values())
+        } else {
+          this._tags = [...collection]
+        }
+      },
+    })
+    this.subscriptions = [...this.subscriptions, tagSub]
+
+    // Load tour snapshots
+    try {
+      this._tourSnapshots = await sdk.Tour.getData()
+    } catch {
+      this._tourSnapshots = []
+    }
+
+    // Load model details
+    try {
+      this._modelDetails = await sdk.Model.getDetails()
+    } catch {
+      this._modelDetails = null
     }
   }
 

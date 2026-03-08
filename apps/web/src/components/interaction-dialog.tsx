@@ -39,13 +39,25 @@ export function InteractionDialog({
   const handleObjectClick = useCallback(
     (obj: ObjectRecord) => {
       if (sdkConnected) {
-        void bridge.addAnnotation({
-          label: obj.title,
-          description: obj.aiSummary,
-          position: { x: 0, y: 1, z: 0 },
-          createdBy: "manual",
+        // Place 3D tag at current camera view with animation feedback
+        void bridge.addTagAtCurrentView(
+          obj.title,
+          obj.aiSummary,
+          { r: 0.8, g: 0.69, b: 0.43 }
+        ).then((tagId) => {
+          if (tagId) {
+            setMessage(`Tag "${obj.title}" placed in 3D space`)
+            setTimeout(() => setMessage(""), 3000)
+          }
         })
       }
+      // Also add to local annotations
+      bridge.addAnnotation({
+        label: obj.title,
+        description: obj.aiSummary,
+        position: { x: 0, y: 1, z: 0 },
+        createdBy: "manual",
+      })
     },
     [bridge, sdkConnected]
   )
@@ -167,11 +179,11 @@ export function InteractionDialog({
                               {t.common.edit}
                             </button>
                             <button
-                              className="interaction-dialog__action-btn"
+                              className="interaction-dialog__action-btn interaction-dialog__action-btn--interact"
                               onClick={() => handleObjectClick(obj)}
                               type="button"
                             >
-                              {t.ai.addAnnotation}
+                              3D Tag
                             </button>
                           </div>
                         ) : (

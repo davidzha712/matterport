@@ -4,6 +4,7 @@ import type { ChangeEvent, FormEvent } from "react"
 import { useCallback, useDeferredValue, useEffect, useState, useTransition } from "react"
 import { getBrowserApiBaseUrl } from "@/lib/browser-api"
 import { useT } from "@/lib/i18n"
+import { useVoiceInput } from "@/lib/use-voice-input"
 import type { RoomRecord, SpaceRecord } from "@/lib/mock-data"
 
 type TaskType = "vision-detect" | "narrative-summarize" | "workflow-assist"
@@ -41,6 +42,11 @@ export function CommandBar({ room, space }: CommandBarProps) {
   const t = useT()
   const [taskType, setTaskType] = useState<TaskType>("vision-detect")
   const [command, setCommand] = useState("")
+
+  const handleVoiceTranscript = useCallback((text: string) => {
+    setCommand((prev) => (prev ? `${prev} ${text}` : text))
+  }, [])
+  const voice = useVoiceInput(handleVoiceTranscript)
   const [imageUrl, setImageUrl] = useState("")
   const [imageAttachment, setImageAttachment] = useState<ImageAttachmentState | null>(null)
   const [isReadingImage, setIsReadingImage] = useState(false)
@@ -274,6 +280,28 @@ export function CommandBar({ room, space }: CommandBarProps) {
           type="text"
           value={command}
         />
+
+        <div className="command-bar__voice-row">
+          <button
+            className={`command-bar__voice-btn${voice.isRecording ? " command-bar__voice-btn--recording" : ""}`}
+            disabled={voice.isTranscribing}
+            onClick={voice.toggleRecording}
+            title={voice.isRecording ? "Stop" : "Voice Input (Groq Whisper)"}
+            type="button"
+          >
+            <span className="command-bar__voice-icon" aria-hidden="true">
+              {voice.isRecording ? "■" : "●"}
+            </span>
+            {voice.isRecording
+              ? "Stop"
+              : voice.isTranscribing
+                ? t.common.loading
+                : "Voice"}
+          </button>
+          {voice.error ? (
+            <span className="command-bar__voice-error">{voice.error}</span>
+          ) : null}
+        </div>
 
         {requiresImage ? (
           <div className="command-bar__attachment-stack">

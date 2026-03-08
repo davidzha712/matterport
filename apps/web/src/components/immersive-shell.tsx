@@ -42,7 +42,7 @@ function ImmersiveShellInner({
 }: ImmersiveShellProps) {
   const reduceMotion = useReducedMotion()
   const t = useT()
-  const { bridge, status } = useBridge()
+  const { bridge, status, currentRoom: sdkRoom, currentSweep, currentMode, isTourActive } = useBridge()
   const {
     isImmersive,
     showDialog,
@@ -53,8 +53,18 @@ function ImmersiveShellInner({
     setShowDialog,
   } = useImmersiveMode(bridge)
 
-  const focalRoom = selectedRoom ?? space.rooms[0]
-  const focalObject = selectedObject ?? space.objects[0]
+  // Match SDK room name to our data model for reactive room tracking
+  const matchedRoom = sdkRoom
+    ? space.rooms.find((r) =>
+        r.name.toLowerCase() === sdkRoom.name.toLowerCase() ||
+        r.id === sdkRoom.id
+      )
+    : undefined
+  const focalRoom = selectedRoom ?? matchedRoom ?? space.rooms[0]
+
+  // Match objects by room
+  const roomObjects = space.objects.filter((o) => o.roomId === focalRoom.id)
+  const focalObject = selectedObject ?? roomObjects[0] ?? space.objects[0]
 
   const dur = reduceMotion ? 0 : 0.4
   const ease = [0.22, 1, 0.36, 1] as const
@@ -221,10 +231,26 @@ function ImmersiveShellInner({
               transition={{ duration: 0.4, ease }}
             >
               <div className="immersive-hud__top">
-                <span className="immersive-hud__label">{focalRoom.name}</span>
-                <span className="immersive-hud__status">
-                  {status === "sdk-connected" ? "SDK" : "Iframe"}
-                </span>
+                <div className="immersive-hud__room-info">
+                  <span className="immersive-hud__label">{sdkRoom?.name ?? focalRoom.name}</span>
+                  {currentSweep ? (
+                    <span className="immersive-hud__sweep">
+                      Sweep: {currentSweep.sid.slice(0, 8)}
+                      {currentSweep.neighbors.length > 0 ? ` · ${currentSweep.neighbors.length} neighbors` : ""}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="immersive-hud__badges">
+                  <span className="immersive-hud__status">
+                    {status === "sdk-connected" ? "SDK" : "Iframe"}
+                  </span>
+                  <span className="immersive-hud__mode-badge">
+                    {currentMode}
+                  </span>
+                  {isTourActive ? (
+                    <span className="immersive-hud__tour-badge">Tour</span>
+                  ) : null}
+                </div>
               </div>
               <div className="immersive-hud__bottom">
                 <span className="immersive-hud__hint">WASD — Move</span>
