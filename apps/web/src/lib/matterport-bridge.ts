@@ -367,7 +367,7 @@ export class MatterportBridge {
         }
       })
 
-      const mpSdk = await embeddingWindow.MP_SDK.connect(iframe, sdkKey, "3.10")
+      const mpSdk = await embeddingWindow.MP_SDK.connect(iframe, sdkKey, "")
       this.sdk = mpSdk
       this._status = "sdk-connected"
 
