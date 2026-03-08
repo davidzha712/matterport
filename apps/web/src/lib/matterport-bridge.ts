@@ -787,6 +787,54 @@ export class MatterportBridge {
   }
 
   // -----------------------------------------------------------------------
+  // Directional navigation (WASD FPS-style)
+  // -----------------------------------------------------------------------
+
+  async navigateInDirection(
+    direction: "forward" | "backward"
+  ): Promise<boolean> {
+    if (!this.sdk || !this._currentSweep || !this._lastPose) {
+      return false
+    }
+
+    const yawDeg = this._lastPose.rotation.x
+    const yaw = (yawDeg * Math.PI) / 180
+    const sign = direction === "forward" ? 1 : -1
+
+    const dirX = Math.sin(yaw) * sign
+    const dirZ = -Math.cos(yaw) * sign
+
+    const current = this._currentSweep
+    const candidates = current.neighbors
+      .map((sid) => this._sweeps.find((s) => s.sid === sid))
+      .filter(
+        (s): s is SweepData => s != null && s.enabled
+      )
+
+    if (candidates.length === 0) {
+      return false
+    }
+
+    let best: SweepData = candidates[0]
+    let bestDot = -Infinity
+
+    for (const sweep of candidates) {
+      const dx = sweep.position.x - current.position.x
+      const dz = sweep.position.z - current.position.z
+      const dist = Math.sqrt(dx * dx + dz * dz)
+      if (dist < 0.01) continue
+
+      const dot = (dx / dist) * dirX + (dz / dist) * dirZ
+      if (dot > bestDot) {
+        bestDot = dot
+        best = sweep
+      }
+    }
+
+    return this.navigateToSweep(best.sid, { transition: "fly" })
+  }
+
+  // -----------------------------------------------------------------------
   // Tag editing (in-place, without remove+add)
   // -----------------------------------------------------------------------
 

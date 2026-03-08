@@ -147,6 +147,17 @@ export const translations = {
       iframeOnly: "Nur Iframe",
       disconnected: "Getrennt",
     },
+    immersive: {
+      enter: "Eintauchen",
+      exit: "Verlassen",
+      move: "Bewegen",
+      interact: "Interagieren",
+      wasdHint: "WASD — Bewegen",
+      spaceHint: "Leertaste — Interagieren",
+      escHint: "ESC — Verlassen",
+      visitor: "Besucher",
+      admin: "Verwaltung",
+    },
   },
   en: {
     common: {
@@ -295,6 +306,17 @@ export const translations = {
       sdkConnected: "SDK Connected",
       iframeOnly: "Iframe Only",
       disconnected: "Disconnected",
+    },
+    immersive: {
+      enter: "Enter Immersive",
+      exit: "Exit",
+      move: "Move",
+      interact: "Interact",
+      wasdHint: "WASD — Move",
+      spaceHint: "Space — Interact",
+      escHint: "ESC — Exit",
+      visitor: "Visitor",
+      admin: "Admin",
     },
   },
 } satisfies Record<string, Record<string, Record<string, string>>>

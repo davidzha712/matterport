@@ -2409,3 +2409,427 @@ ul {
 .landing__footer-links a:hover {
   color: var(--text);
 }
+
+/* ===================================================================
+   Immersive Mode
+   =================================================================== */
+
+/* Immersive state — hide cursor on stage when fully immersed */
+.immersive-shell--immersive .stage-shell {
+  cursor: crosshair;
+}
+
+/* Enter Immersive button */
+.immersive-enter-btn {
+  position: absolute;
+  bottom: 80px;
+  right: 24px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(8, 17, 26, 0.85);
+  backdrop-filter: blur(12px);
+  color: var(--accent);
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, transform 0.15s;
+}
+
+.immersive-enter-btn:hover {
+  background: rgba(203, 176, 110, 0.12);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.immersive-enter-btn__icon {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.7; box-shadow: 0 0 6px var(--accent); }
+  50% { opacity: 1; box-shadow: 0 0 14px var(--accent); }
+}
+
+/* Immersive HUD overlay */
+.immersive-hud {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 20px 24px;
+}
+
+.immersive-hud__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.immersive-hud__label {
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  background: rgba(8, 17, 26, 0.5);
+  backdrop-filter: blur(8px);
+}
+
+.immersive-hud__status {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(8, 17, 26, 0.5);
+  backdrop-filter: blur(8px);
+}
+
+.immersive-hud__bottom {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+}
+
+.immersive-hud__hint {
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.5);
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  background: rgba(8, 17, 26, 0.4);
+  backdrop-filter: blur(8px);
+}
+
+.immersive-hud__exit {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 30;
+  pointer-events: auto;
+  padding: 6px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-sm);
+  background: rgba(8, 17, 26, 0.6);
+  backdrop-filter: blur(8px);
+  color: rgba(255, 255, 255, 0.7);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.immersive-hud__exit:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+}
+
+/* ===================================================================
+   Interaction Dialog
+   =================================================================== */
+
+.interaction-dialog__backdrop {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  width: min(560px, calc(100% - 48px));
+}
+
+.interaction-dialog {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: rgba(8, 17, 26, 0.92);
+  backdrop-filter: blur(20px) saturate(1.4);
+  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.6), 0 0 1px rgba(203, 176, 110, 0.2);
+  overflow: hidden;
+}
+
+.interaction-dialog__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.interaction-dialog__eyebrow {
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 2px;
+}
+
+.interaction-dialog__title {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text);
+}
+
+.interaction-dialog__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.interaction-dialog__role-switch {
+  display: flex;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.interaction-dialog__role-btn {
+  padding: 4px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.interaction-dialog__role-btn:first-child {
+  border-right: 1px solid var(--border);
+}
+
+.interaction-dialog__role-btn--active {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.interaction-dialog__close {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.interaction-dialog__close:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+
+.interaction-dialog__toast {
+  padding: 8px 20px;
+  background: rgba(203, 176, 110, 0.1);
+  border-bottom: 1px solid rgba(203, 176, 110, 0.2);
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--accent);
+}
+
+.interaction-dialog__body {
+  padding: 16px 20px;
+  max-height: 280px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.interaction-dialog__section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.interaction-dialog__section-label {
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.interaction-dialog__room-name {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.interaction-dialog__description {
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.interaction-dialog__object-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.interaction-dialog__object-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.interaction-dialog__object-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(203, 176, 110, 0.2);
+}
+
+.interaction-dialog__object-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.interaction-dialog__object-info strong {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.interaction-dialog__object-type {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+}
+
+.interaction-dialog__object-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.interaction-dialog__action-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 0.6rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.interaction-dialog__action-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+
+.interaction-dialog__action-btn--primary {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+
+.interaction-dialog__action-btn--primary:hover {
+  background: var(--accent-strong);
+}
+
+.interaction-dialog__action-btn--interact {
+  border-color: rgba(203, 176, 110, 0.3);
+  color: var(--accent);
+}
+
+.interaction-dialog__action-btn--interact:hover {
+  background: rgba(203, 176, 110, 0.08);
+}
+
+.interaction-dialog__empty {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 16px 0;
+  margin: 0;
+}
+
+.interaction-dialog__editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(203, 176, 110, 0.2);
+  background: rgba(203, 176, 110, 0.04);
+}
+
+.interaction-dialog__textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(8, 17, 26, 0.6);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.interaction-dialog__textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.interaction-dialog__editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.interaction-dialog__footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 20px;
+  border-top: 1px solid var(--border);
+}
+
+.interaction-dialog__hint {
+  font-size: 0.58rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
