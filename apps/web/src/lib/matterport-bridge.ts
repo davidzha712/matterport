@@ -343,13 +343,15 @@ export class MatterportBridge {
     this.iframe = iframe
     this._status = "iframe-only"
 
+    // SDK connection runs in background — never blocks the iframe from loading
     const sdkKey = process.env.NEXT_PUBLIC_MATTERPORT_SDK_KEY
-    if (!sdkKey) {
-      return
+    if (sdkKey) {
+      void this.connectSdk(iframe, sdkKey)
     }
+  }
 
+  private async connectSdk(iframe: HTMLIFrameElement, sdkKey: string): Promise<void> {
     try {
-      // Load the Matterport SDK bundle on the parent page if not already loaded
       await this.ensureSdkBundle()
 
       const embeddingWindow = window as unknown as ShowcaseEmbedWindow
@@ -358,23 +360,34 @@ export class MatterportBridge {
         return
       }
 
-      // Wait for the iframe to be ready before connecting
-      await new Promise<void>((resolve) => {
-        if (iframe.contentDocument?.readyState === "complete") {
-          resolve()
-        } else {
-          iframe.addEventListener("load", () => resolve(), { once: true })
-        }
-      })
+      // Race SDK connect against a timeout so it never hangs forever
+      const SDK_TIMEOUT = 60_000
+      const mpSdk = await Promise.race([
+        embeddingWindow.MP_SDK.connect(iframe, sdkKey, ""),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("SDK connect timeout")), SDK_TIMEOUT)
+        ),
+      ])
 
-      const mpSdk = await embeddingWindow.MP_SDK.connect(iframe, sdkKey, "")
       this.sdk = mpSdk
       this._status = "sdk-connected"
 
       this.initSubscriptions()
+
+      // Wait for model to be fully loaded and SDK internals to initialize
+      await new Promise<void>((resolve) => {
+        let resolved = false
+        const done = () => { if (!resolved) { resolved = true; resolve() } }
+        mpSdk.on(mpSdk.Model.Event.MODEL_LOADED, done)
+        void mpSdk.Model.getData().then(done).catch(() => {})
+        // Safety fallback
+        setTimeout(done, 5000)
+      })
+      // Additional settle time for SDK internal APIs (Floor, Renderer, etc.)
+      await new Promise((r) => setTimeout(r, 2000))
+
       await this.loadModelData()
     } catch (error) {
-      // SDK connection failed — stay in iframe-only mode
       console.error("Matterport SDK connection failed:", error)
     }
   }
@@ -475,10 +488,19 @@ export class MatterportBridge {
       floorplan: this.sdk.Mode.Mode.FLOORPLAN,
     }
 
+    // Try with FLY transition, retry with INSTANT if that fails
+    for (const transition of [this.sdk.Mode.TransitionType.FLY, this.sdk.Mode.TransitionType.INSTANT]) {
+      try {
+        await this.sdk.Mode.moveTo(modeMap[mode], { transition })
+        return true
+      } catch {
+        // retry with next transition type
+      }
+    }
+
+    // Final attempt without options
     try {
-      await this.sdk.Mode.moveTo(modeMap[mode], {
-        transition: this.sdk.Mode.TransitionType.FLY,
-      })
+      await this.sdk.Mode.moveTo(modeMap[mode])
       return true
     } catch (error) {
       console.error("setViewMode failed:", error)
@@ -729,19 +751,28 @@ export class MatterportBridge {
       return null
     }
 
-    try {
-      const effectiveResolution = resolution
-        ? { ...resolution }
-        : { width: 1920, height: 1080 }
+    // Try with requested resolution, fallback to smaller, then no-args
+    const resolutions: Array<ScreenshotResolution | undefined> = [
+      resolution ?? { width: 1920, height: 1080 },
+      { width: 1280, height: 720 },
+      undefined,
+    ]
 
-      const base64 = await this.sdk.Renderer.takeScreenShot(effectiveResolution)
-      return base64.startsWith("data:")
-        ? base64
-        : `data:image/png;base64,${base64}`
-    } catch (error) {
-      console.error("captureScreenshot failed:", error)
-      return null
+    for (const res of resolutions) {
+      try {
+        const base64 = res
+          ? await this.sdk.Renderer.takeScreenShot(res)
+          : await this.sdk.Renderer.takeScreenShot()
+        return base64.startsWith("data:")
+          ? base64
+          : `data:image/png;base64,${base64}`
+      } catch {
+        // try next resolution
+      }
     }
+
+    console.error("captureScreenshot: all attempts failed")
+    return null
   }
 
   // -----------------------------------------------------------------------

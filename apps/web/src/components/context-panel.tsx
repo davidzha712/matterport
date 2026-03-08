@@ -23,7 +23,7 @@ export function ContextPanel({ providers, selectedObject, selectedRoom, space }:
   // Match SDK room to our data model for reactive room tracking
   const matchedRoom = sdkRoom
     ? space.rooms.find((r) =>
-        r.name.toLowerCase() === sdkRoom.name.toLowerCase() ||
+        (sdkRoom.name && r.name.toLowerCase() === sdkRoom.name.toLowerCase()) ||
         r.id === sdkRoom.id
       )
     : undefined

@@ -38,13 +38,13 @@ export function getMatterportEmbedUrl(modelSid: string): string {
     brand: "0",
     title: "0",
     help: "0",
-    gt: "0",
-    hr: "0",
-    f: "0",
+    gt: "1",    // guided tour enabled
+    hr: "1",    // highlight reel enabled
+    f: "1",     // fullscreen enabled
     mls: "2",
-    mt: "0",
-    dh: "0",
-    fp: "0",
+    mt: "1",    // mattertags (3D labels) enabled
+    dh: "1",    // dollhouse mode enabled
+    fp: "1",    // floorplan mode enabled
   }
 
   if (sdkKey) {

@@ -10,6 +10,6 @@ export default defineConfig({
     cwd: __dirname,
     command: "npm run start -- --port 3000",
     port: 3000,
-    reuseExistingServer: false
+    reuseExistingServer: true
   }
 })

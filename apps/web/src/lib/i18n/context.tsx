@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 import { translations } from "./translations"
 
 export type Locale = "de" | "en"
@@ -16,13 +16,16 @@ type I18nContextValue = {
 const I18nContext = createContext<I18nContextValue | null>(null)
 
 export function LocaleProvider({ children, defaultLocale = "de" }: { children: ReactNode; defaultLocale?: Locale }) {
-  const [locale, setLocaleState] = useState<Locale>(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("locale")
-      if (stored === "de" || stored === "en") return stored
+  // Always start with defaultLocale to avoid hydration mismatch
+  const [locale, setLocaleState] = useState<Locale>(defaultLocale)
+
+  // Restore saved locale after mount (client-only)
+  useEffect(() => {
+    const stored = localStorage.getItem("locale")
+    if ((stored === "de" || stored === "en") && stored !== defaultLocale) {
+      setLocaleState(stored)
     }
-    return defaultLocale
-  })
+  }, [defaultLocale])
 
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next)
