@@ -2,7 +2,6 @@
 
 import type { ChangeEvent, FormEvent } from "react"
 import { useCallback, useDeferredValue, useEffect, useRef, useState, useTransition } from "react"
-import { getBrowserApiBaseUrl } from "@/lib/browser-api"
 import { useBridge } from "@/lib/bridge-context"
 import { useLocale } from "@/lib/i18n"
 import { useVoiceCommands } from "@/lib/use-voice-commands"
@@ -202,20 +201,22 @@ export function CommandBar({ room, space }: CommandBarProps) {
 
       void (async () => {
         try {
-          const response = await fetch(`${getBrowserApiBaseUrl()}/ai/tasks`, {
-            body: JSON.stringify({
-              input: {
-                attachments: activeAttachment
-                  ? [{ kind: "image", label: activeAttachment.label, url: activeAttachment.url }]
-                  : [],
-                context: { mode: "immersive-shell" },
-                prompt: command,
-                projectId: space.projectId,
-                roomId: room?.id,
-                spaceId: space.id
-              },
-              taskType
-            }),
+          const requestBody = {
+            input: {
+              attachments: activeAttachment
+                ? [{ kind: "image", label: activeAttachment.label, url: activeAttachment.url }]
+                : [],
+              context: { mode: "immersive-shell" },
+              prompt: command,
+              projectId: space.projectId,
+              roomId: room?.id,
+              spaceId: space.id
+            },
+            taskType
+          }
+
+          const response = await fetch("/api/ai/vision", {
+            body: JSON.stringify(requestBody),
             headers: { "Content-Type": "application/json" },
             method: "POST"
           })

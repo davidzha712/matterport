@@ -2024,6 +2024,18 @@ ul {
   background: rgba(203, 176, 110, 0.15);
   color: var(--accent);
 }
+.stage-toolbar__btn--accent {
+  background: rgba(203, 176, 110, 0.12);
+  color: var(--accent);
+  border: 1px solid rgba(203, 176, 110, 0.25);
+}
+.stage-toolbar__btn--accent:hover:not(:disabled) {
+  background: rgba(203, 176, 110, 0.25);
+}
+.stage-toolbar__btn--accent:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
 
 /* Locale switcher */
 .locale-switcher {

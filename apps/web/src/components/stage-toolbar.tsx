@@ -1,26 +1,38 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import type { MatterportBridge, ViewMode } from "@/lib/matterport-bridge"
+import type { MatterportBridge, ViewMode, RoomData } from "@/lib/matterport-bridge"
 import { useT } from "@/lib/i18n"
 
 type StageToolbarProps = {
   bridge: MatterportBridge
+  currentRoom?: RoomData
 }
 
 type TourState = "idle" | "playing" | "paused"
 
-export function StageToolbar({ bridge }: StageToolbarProps) {
+export function StageToolbar({ bridge, currentRoom }: StageToolbarProps) {
   const t = useT()
   const [currentMode, setCurrentMode] = useState<ViewMode>("inside")
   const [tourState, setTourState] = useState<TourState>("idle")
   const [sdkReady, setSdkReady] = useState(bridge.status === "sdk-connected")
+  const [showDimensions, setShowDimensions] = useState(false)
+  const [analysisStatus, setAnalysisStatus] = useState<string | null>(null)
 
   const viewModeLabels: Record<ViewMode, string> = {
     inside: t.viewModes.inside,
     dollhouse: t.viewModes.dollhouse,
     floorplan: t.viewModes.floorplan,
   }
+
+  // Room dimensions from SDK bounds
+  const roomDimensions = currentRoom?.bounds
+    ? {
+        width: Math.abs(currentRoom.bounds.max.x - currentRoom.bounds.min.x).toFixed(1),
+        depth: Math.abs(currentRoom.bounds.max.z - currentRoom.bounds.min.z).toFixed(1),
+        height: Math.abs(currentRoom.bounds.max.y - currentRoom.bounds.min.y).toFixed(1),
+      }
+    : null
 
   useEffect(() => {
     const unsubMode = bridge.onModeChange((mode) => {
@@ -78,6 +90,23 @@ export function StageToolbar({ bridge }: StageToolbarProps) {
       )
     }
   }, [bridge])
+
+  const handleVisionAnalysis = useCallback(async () => {
+    setAnalysisStatus(t.ai.analyzing)
+    const dataUrl = await bridge.captureScreenshot()
+    if (dataUrl) {
+      window.dispatchEvent(
+        new CustomEvent("matterport-screenshot", { detail: { dataUrl } })
+      )
+      // Auto-submit after command-bar picks up the screenshot
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("auto-vision-analyze"))
+        setAnalysisStatus(null)
+      }, 400)
+    } else {
+      setAnalysisStatus(null)
+    }
+  }, [bridge, t])
 
   if (!sdkReady) {
     return null
@@ -148,6 +177,31 @@ export function StageToolbar({ bridge }: StageToolbarProps) {
       >
         {t.stage.captureView}
       </button>
+
+      <button
+        className="stage-toolbar__btn stage-toolbar__btn--accent"
+        disabled={analysisStatus !== null}
+        onClick={() => void handleVisionAnalysis()}
+        title={t.ai.detectObjects}
+        type="button"
+      >
+        {analysisStatus ?? t.ai.detectObjects}
+      </button>
+
+      {roomDimensions ? (
+        <>
+          <div className="stage-toolbar__divider" aria-hidden="true" />
+          <button
+            className={`stage-toolbar__btn${showDimensions ? " stage-toolbar__btn--active" : ""}`}
+            onClick={() => setShowDimensions((v) => !v)}
+            type="button"
+          >
+            {showDimensions
+              ? `${roomDimensions.width}m × ${roomDimensions.depth}m × ${roomDimensions.height}m`
+              : `${currentRoom?.name ?? ""} ${t.stage.roomContext}`}
+          </button>
+        </>
+      ) : null}
     </div>
   )
 }

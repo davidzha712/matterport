@@ -194,7 +194,7 @@ function ImmersiveShellInner({
         </motion.aside>
 
         <StageControls />
-        <StageToolbar bridge={bridge} />
+        <StageToolbar bridge={bridge} currentRoom={sdkRoom} />
 
         {/* Bottom chrome */}
         <motion.footer
