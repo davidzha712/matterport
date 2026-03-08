@@ -17,7 +17,7 @@ export const sanityClient = createClient({
   apiVersion,
   dataset,
   perspective: "published",
-  projectId: projectId || "not-configured",
+  projectId: projectId || "placeholder0",
   token: readToken,
   useCdn: false
 })
