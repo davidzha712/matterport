@@ -1,9 +1,11 @@
 "use client"
 
 import type { ChangeEvent, FormEvent } from "react"
-import { useCallback, useDeferredValue, useEffect, useState, useTransition } from "react"
+import { useCallback, useDeferredValue, useEffect, useRef, useState, useTransition } from "react"
 import { getBrowserApiBaseUrl } from "@/lib/browser-api"
-import { useT } from "@/lib/i18n"
+import { useBridge } from "@/lib/bridge-context"
+import { useLocale } from "@/lib/i18n"
+import { useVoiceCommands } from "@/lib/use-voice-commands"
 import { useVoiceInput } from "@/lib/use-voice-input"
 import type { RoomRecord, SpaceRecord } from "@/lib/platform-types"
 
@@ -39,14 +41,29 @@ const acceptedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"])
 const maxImageBytes = 8 * 1024 * 1024
 
 export function CommandBar({ room, space }: CommandBarProps) {
-  const t = useT()
+  const { locale, t } = useLocale()
+  const { bridge } = useBridge()
+  const { executeCommand } = useVoiceCommands(bridge, space)
   const [taskType, setTaskType] = useState<TaskType>("vision-detect")
   const [command, setCommand] = useState("")
+  const [voiceFeedback, setVoiceFeedback] = useState<string | null>(null)
 
-  const handleVoiceTranscript = useCallback((text: string) => {
-    setCommand((prev) => (prev ? `${prev} ${text}` : text))
-  }, [])
-  const voice = useVoiceInput(handleVoiceTranscript)
+  const handleVoiceTranscript = useCallback(
+    (text: string) => {
+      // Try to parse as a spatial command first
+      void executeCommand(text).then((result) => {
+        if (result.handled) {
+          setVoiceFeedback(result.feedback)
+          setTimeout(() => setVoiceFeedback(null), 3000)
+        } else {
+          // Not a command — fill into the search box for AI analysis
+          setCommand((prev) => (prev ? `${prev} ${text}` : text))
+        }
+      })
+    },
+    [executeCommand]
+  )
+  const voice = useVoiceInput(handleVoiceTranscript, { locale })
   const [imageUrl, setImageUrl] = useState("")
   const [imageAttachment, setImageAttachment] = useState<ImageAttachmentState | null>(null)
   const [isReadingImage, setIsReadingImage] = useState(false)
@@ -98,7 +115,19 @@ export function CommandBar({ room, space }: CommandBarProps) {
 
     window.addEventListener("matterport-screenshot", onScreenshot)
     return () => window.removeEventListener("matterport-screenshot", onScreenshot)
-  }, [taskType])
+  }, [taskType, t])
+
+  // Listen for auto-vision-analyze event (V key in immersive mode)
+  const formRef = useRef<HTMLFormElement>(null)
+  useEffect(() => {
+    function onAutoAnalyze() {
+      // Trigger form submission programmatically
+      formRef.current?.requestSubmit()
+    }
+
+    window.addEventListener("auto-vision-analyze", onAutoAnalyze)
+    return () => window.removeEventListener("auto-vision-analyze", onAutoAnalyze)
+  }, [])
 
   const activeAttachment =
     imageAttachment ??
@@ -264,7 +293,7 @@ export function CommandBar({ room, space }: CommandBarProps) {
         })}
       </div>
 
-      <form className="command-bar__form" onSubmit={handleSubmit}>
+      <form className="command-bar__form" onSubmit={handleSubmit} ref={formRef}>
         <label className="sr-only" htmlFor="command-bar-input">
           {t.common.search}
         </label>
@@ -300,6 +329,11 @@ export function CommandBar({ room, space }: CommandBarProps) {
           </button>
           {voice.error ? (
             <span className="command-bar__voice-error">{voice.error}</span>
+          ) : null}
+          {voiceFeedback ? (
+            <span className="command-bar__voice-feedback" aria-live="polite">
+              {voiceFeedback}
+            </span>
           ) : null}
         </div>
 

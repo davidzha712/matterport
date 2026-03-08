@@ -84,6 +84,23 @@ export function useImmersiveMode(bridge: MatterportBridge) {
           e.preventDefault()
           setShowDialog((prev) => !prev)
           break
+
+        case "v":
+        case "V":
+          e.preventDefault()
+          // One-key vision analysis: screenshot → auto-submit to AI
+          void bridge.captureScreenshot().then((dataUrl) => {
+            if (dataUrl) {
+              window.dispatchEvent(
+                new CustomEvent("matterport-screenshot", { detail: { dataUrl } })
+              )
+              // Auto-submit after a short delay to let command-bar pick up the screenshot
+              setTimeout(() => {
+                window.dispatchEvent(new CustomEvent("auto-vision-analyze"))
+              }, 300)
+            }
+          })
+          break
       }
     }
 

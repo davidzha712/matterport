@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useState } from "react"
 import { motion, useReducedMotion, AnimatePresence } from "framer-motion"
 import { CommandBar } from "@/components/command-bar"
 import { ContextPanel } from "@/components/context-panel"
@@ -12,6 +13,7 @@ import { StageToolbar } from "@/components/stage-toolbar"
 import { LocaleSwitcher } from "@/components/locale-switcher"
 import { BridgeProvider, useBridge } from "@/lib/bridge-context"
 import { useT } from "@/lib/i18n"
+import { useAutoTour } from "@/lib/use-auto-tour"
 import { useImmersiveMode } from "@/lib/use-immersive-mode"
 import type { ObjectRecord, ProviderProfile, RoomRecord, SpaceRecord } from "@/lib/platform-types"
 import { buildSpaceRoute } from "@/lib/routes"
@@ -52,6 +54,17 @@ function ImmersiveShellInner({
     setRole,
     setShowDialog,
   } = useImmersiveMode(bridge)
+  const { autoTourState, stopAutoTour } = useAutoTour(bridge, status, isTourActive)
+  const [showDimensions, setShowDimensions] = useState(false)
+
+  // Compute room dimensions from SDK bounds (meters)
+  const roomDimensions = sdkRoom?.bounds
+    ? {
+        width: Math.abs(sdkRoom.bounds.max.x - sdkRoom.bounds.min.x).toFixed(1),
+        depth: Math.abs(sdkRoom.bounds.max.z - sdkRoom.bounds.min.z).toFixed(1),
+        height: Math.abs(sdkRoom.bounds.max.y - sdkRoom.bounds.min.y).toFixed(1),
+      }
+    : null
 
   // Match SDK room name to our data model for reactive room tracking
   const matchedRoom = sdkRoom
@@ -197,6 +210,15 @@ function ImmersiveShellInner({
               <strong>{focalRoom.name}</strong>
             </div>
             <p>{focalObject.title}</p>
+            {autoTourState === "touring" ? (
+              <button
+                className="stage-storyline__auto-tour-btn"
+                onClick={stopAutoTour}
+                type="button"
+              >
+                {t.tour.stopTour}
+              </button>
+            ) : null}
           </div>
           <ModeRail currentMode={focusMode} spaceId={space.id} />
         </motion.footer>
@@ -239,6 +261,22 @@ function ImmersiveShellInner({
                       {currentSweep.neighbors.length > 0 ? ` · ${currentSweep.neighbors.length} neighbors` : ""}
                     </span>
                   ) : null}
+                  {roomDimensions ? (
+                    <button
+                      className="immersive-hud__dim-toggle"
+                      onClick={() => setShowDimensions((v) => !v)}
+                      type="button"
+                    >
+                      {showDimensions ? "Hide Dimensions" : "Show Dimensions"}
+                    </button>
+                  ) : null}
+                  {showDimensions && roomDimensions ? (
+                    <div className="immersive-hud__dimensions">
+                      <span>{roomDimensions.width}m W</span>
+                      <span>{roomDimensions.depth}m D</span>
+                      <span>{roomDimensions.height}m H</span>
+                    </div>
+                  ) : null}
                 </div>
                 <div className="immersive-hud__badges">
                   <span className="immersive-hud__status">
@@ -248,14 +286,17 @@ function ImmersiveShellInner({
                     {currentMode}
                   </span>
                   {isTourActive ? (
-                    <span className="immersive-hud__tour-badge">Tour</span>
+                    <span className="immersive-hud__tour-badge">
+                      {autoTourState === "touring" ? "Auto Tour" : "Tour"}
+                    </span>
                   ) : null}
                 </div>
               </div>
               <div className="immersive-hud__bottom">
-                <span className="immersive-hud__hint">WASD — Move</span>
-                <span className="immersive-hud__hint">Space — Interact</span>
-                <span className="immersive-hud__hint">ESC — Exit</span>
+                <span className="immersive-hud__hint">WASD — {t.immersive.move}</span>
+                <span className="immersive-hud__hint">Space — {t.immersive.interact}</span>
+                <span className="immersive-hud__hint">V — {t.ai.detectObjects}</span>
+                <span className="immersive-hud__hint">ESC — {t.immersive.exit}</span>
               </div>
               <button
                 className="immersive-hud__exit"

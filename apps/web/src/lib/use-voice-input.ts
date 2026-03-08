@@ -4,7 +4,12 @@ import { useCallback, useRef, useState } from "react"
 
 type VoiceState = "idle" | "recording" | "transcribing"
 
-export function useVoiceInput(onTranscript: (text: string) => void) {
+type VoiceInputOptions = {
+  /** ISO locale hint for Whisper (e.g. "de", "en"). Omit for auto-detect. */
+  locale?: string
+}
+
+export function useVoiceInput(onTranscript: (text: string) => void, options?: VoiceInputOptions) {
   const [state, setState] = useState<VoiceState>("idle")
   const [error, setError] = useState<string | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -53,6 +58,9 @@ export function useVoiceInput(onTranscript: (text: string) => void) {
           const formData = new FormData()
           const ext = mimeType.includes("webm") ? "webm" : "mp4"
           formData.append("file", audioBlob, `recording.${ext}`)
+          if (options?.locale) {
+            formData.append("language", options.locale)
+          }
 
           const response = await fetch("/api/transcribe", {
             method: "POST",
