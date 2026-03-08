@@ -14,3 +14,4 @@ test-results/
 __pycache__/
 *.egg-info/
 *.pyc
+.vercel

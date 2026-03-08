@@ -3,8 +3,6 @@ import "server-only"
 import { createClient } from "next-sanity"
 
 export const projectId = process.env.NEXT_PUBLIC_SANITY_PROJECT_ID ?? ""
-// eslint-disable-next-line no-console
-console.log("[sanity/client] projectId resolved to:", JSON.stringify(projectId || "placeholder0"))
 export const dataset = process.env.NEXT_PUBLIC_SANITY_DATASET || "production"
 export const apiVersion = process.env.SANITY_API_VERSION || "2024-01-01"
 const readToken = process.env.SANITY_API_READ_TOKEN
