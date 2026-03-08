@@ -215,7 +215,7 @@ interface ShowcaseEmbedWindow extends Window {
     connect: (
       iframe: HTMLIFrameElement,
       applicationKey: string,
-      unused?: string
+      sdkVersion?: string
     ) => Promise<MpSdk>
   }
 }
@@ -367,7 +367,7 @@ export class MatterportBridge {
         }
       })
 
-      const mpSdk = await embeddingWindow.MP_SDK.connect(iframe, sdkKey)
+      const mpSdk = await embeddingWindow.MP_SDK.connect(iframe, sdkKey, "3.10")
       this.sdk = mpSdk
       this._status = "sdk-connected"
 
