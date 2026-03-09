@@ -31,7 +31,7 @@ export function MatterportStage({
   )
 
   return (
-    <section aria-label="Immersive Stage" className="stage-shell">
+    <section aria-label={t.matterportStage.immersiveStage} className="stage-shell">
       {embed.state === "connected" && iframeSource ? (
         <iframe
           allow="fullscreen; xr-spatial-tracking; accelerometer; gyroscope"
@@ -46,15 +46,12 @@ export function MatterportStage({
         <div className="stage-placeholder">
           <div className="stage-placeholder__glow" />
           <div className="stage-placeholder__copy">
-            <h3>Die Plattform ist bereit fuer einen live geschalteten Matterport Space.</h3>
-            <p>
-              Hinterlege Model-SID und SDK-Key in `.env.local`, damit diese Stage vom
-              Design-Modus auf die immersive Live-Ansicht umschaltet.
-            </p>
+            <h3>{t.matterportStage.readyTitle}</h3>
+            <p>{t.matterportStage.readyBody}</p>
             <ul className="context-list">
               <li>Space id: {space.id}</li>
-              <li>Konfiguriertes Modell: {embed.modelSid ?? "nicht vorhanden"}</li>
-              <li>SDK-Key-Status: {embed.sdkKeyStatus}</li>
+              <li>{t.matterportStage.configuredModel}: {embed.modelSid ?? t.matterportStage.notAvailable}</li>
+              <li>{t.matterportStage.sdkKeyStatus}: {embed.sdkKeyStatus}</li>
             </ul>
           </div>
         </div>

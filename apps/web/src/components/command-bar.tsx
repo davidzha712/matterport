@@ -42,25 +42,14 @@ type ProgressStep = {
   progress: number
 }
 
-const STEP_LABELS: Record<string, Record<string, string>> = {
-  de: {
-    init: "Vorbereitung…",
-    search: "Web-Kontext wird gesucht…",
-    vlm: "VLM-Bildanalyse…",
-    parse: "Ergebnisse werden geparst…",
-    placing: "3D-Tags werden platziert…",
-    done: "Analyse abgeschlossen",
-    error: "Analyse fehlgeschlagen",
-  },
-  en: {
-    init: "Initializing…",
-    search: "Searching web context…",
-    vlm: "Analyzing image with VLM…",
-    parse: "Parsing detection results…",
-    placing: "Placing 3D annotations…",
-    done: "Analysis complete",
-    error: "Analysis failed",
-  },
+const STEP_KEYS: Record<string, "stepInit" | "stepSearch" | "stepVlm" | "stepParse" | "stepPlacing" | "stepDone" | "stepError"> = {
+  init: "stepInit",
+  search: "stepSearch",
+  vlm: "stepVlm",
+  parse: "stepParse",
+  placing: "stepPlacing",
+  done: "stepDone",
+  error: "stepError",
 }
 
 const acceptedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"])
@@ -446,17 +435,17 @@ export function CommandBar({ room, space }: CommandBarProps) {
             className={`command-bar__voice-btn${voice.isRecording ? " command-bar__voice-btn--recording" : ""}`}
             disabled={voice.isTranscribing}
             onClick={voice.toggleRecording}
-            title={voice.isRecording ? "Stop" : "Voice Input (Groq Whisper)"}
+            title={voice.isRecording ? t.commandBar.stop : t.commandBar.voiceInputTitle}
             type="button"
           >
             <span className="command-bar__voice-icon" aria-hidden="true">
               {voice.isRecording ? "■" : "●"}
             </span>
             {voice.isRecording
-              ? "Stop"
+              ? t.commandBar.stop
               : voice.isTranscribing
                 ? t.common.loading
-                : "Voice"}
+                : t.commandBar.voice}
           </button>
           {voice.error ? (
             <span className="command-bar__voice-error">{voice.error}</span>
@@ -503,7 +492,7 @@ export function CommandBar({ room, space }: CommandBarProps) {
               <div className="command-bar__attachment-card">
                 <div className="command-bar__attachment-thumb">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img alt="Preview" src={activeAttachment.previewUrl} />
+                  <img alt={t.commandBar.imagePreview} src={activeAttachment.previewUrl} />
                 </div>
                 <div className="command-bar__attachment-meta">
                   <strong>{truncateLabel(activeAttachment.label)}</strong>
@@ -555,7 +544,7 @@ export function CommandBar({ room, space }: CommandBarProps) {
           </div>
           <div className="command-bar__progress-info">
             <span className="command-bar__progress-step">
-              {(STEP_LABELS[locale] ?? STEP_LABELS.en)[progress.step] ?? progress.step}
+              {STEP_KEYS[progress.step] ? t.commandBar[STEP_KEYS[progress.step]] : progress.step}
             </span>
             <span className="command-bar__progress-pct">{progress.progress}%</span>
           </div>
@@ -577,7 +566,7 @@ export function CommandBar({ room, space }: CommandBarProps) {
             <>
               {result.taskType === "vision-detect" && Array.isArray(result.output.structuredData?.objects) && result.output.structuredData.objects.length > 0 ? (
                 <div className="command-brief__objects">
-                  <strong>{result.output.structuredData.objects.length} objects detected</strong>
+                  <strong>{result.output.structuredData.objects.length} {t.commandBar.objectsDetected}</strong>
                   <ul>
                     {(result.output.structuredData.objects as Array<{label: string; category?: string; confidence?: number}>).map((obj, i) => (
                       <li key={`${obj.label}-${i}`}>
@@ -593,9 +582,9 @@ export function CommandBar({ room, space }: CommandBarProps) {
                 <p>{result.output.summary}</p>
               )}
               <ul className="command-brief__facts">
-                <li>Provider: {result.provider.providerId}</li>
+                <li>{t.commandBar.providerLabel}: {result.provider.providerId}</li>
                 <li>{t.providers.connected}: {result.provider.configured ? t.common.success : t.common.error}</li>
-                <li>Task: {result.taskType}</li>
+                <li>{t.commandBar.taskLabel}: {result.taskType}</li>
               </ul>
               {result.output.warnings.length ? (
                 <ul className="command-brief__warnings">
