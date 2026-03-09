@@ -5,6 +5,7 @@ import { useState, useTransition } from "react"
 import { getBrowserApiBaseUrl } from "@/lib/browser-api"
 import type { ObjectRecord } from "@/lib/platform-types"
 import { Eyebrow } from "@/components/gallery"
+import { useT } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -21,6 +22,7 @@ type WorkflowUpdateResponse = {
 
 export function ObjectMetadataEditor({ objectRecord, spaceId }: ObjectMetadataEditorProps) {
   const router = useRouter()
+  const t = useT()
   const [draft, setDraft] = useState({
     aiSummary: objectRecord.aiSummary,
     disposition: objectRecord.disposition,
@@ -62,7 +64,7 @@ export function ObjectMetadataEditor({ objectRecord, spaceId }: ObjectMetadataEd
 
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as { detail?: string } | null
-        throw new Error(payload?.detail ?? "Objektdaten konnten nicht gespeichert werden.")
+        throw new Error(payload?.detail ?? t.objects.saveFailed)
       }
 
       const payload = (await response.json()) as WorkflowUpdateResponse
@@ -75,7 +77,7 @@ export function ObjectMetadataEditor({ objectRecord, spaceId }: ObjectMetadataEd
         title: payload.objectRecord.title,
         type: payload.objectRecord.type
       }))
-      setFeedback("Objektdossier gespeichert und in den Workflow zurückgeschrieben.")
+      setFeedback(t.objects.saved)
       window.dispatchEvent(new CustomEvent("workflow-updated", { detail: { spaceId } }))
       startTransition(() => {
         router.refresh()
@@ -84,7 +86,7 @@ export function ObjectMetadataEditor({ objectRecord, spaceId }: ObjectMetadataEd
       setError(
         caughtError instanceof Error
           ? caughtError.message
-          : "Objektdaten konnten nicht gespeichert werden."
+          : t.objects.saveFailed
       )
     } finally {
       setIsSaving(false)
@@ -94,13 +96,13 @@ export function ObjectMetadataEditor({ objectRecord, spaceId }: ObjectMetadataEd
   return (
     <Card>
       <CardHeader>
-        <Eyebrow>Control Room</Eyebrow>
-        <CardTitle>Objekt manuell nachschärfen</CardTitle>
+        <Eyebrow>{t.objects.controlRoom}</Eyebrow>
+        <CardTitle>{t.objects.sharpenManually}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Titel</span>
+            <span className="text-xs text-muted-foreground">{t.objects.titleField}</span>
             <Input
               onChange={(event) => updateField("title", event.target.value)}
               type="text"
@@ -108,7 +110,7 @@ export function ObjectMetadataEditor({ objectRecord, spaceId }: ObjectMetadataEd
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Typ</span>
+            <span className="text-xs text-muted-foreground">{t.objects.type}</span>
             <Input
               onChange={(event) => updateField("type", event.target.value)}
               type="text"
@@ -116,32 +118,32 @@ export function ObjectMetadataEditor({ objectRecord, spaceId }: ObjectMetadataEd
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Status</span>
+            <span className="text-xs text-muted-foreground">{t.common.status}</span>
             <select
               className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               onChange={(event) => updateField("status", event.target.value as ObjectRecord["status"])}
               value={draft.status}
             >
-              <option value="Needs Review">Needs Review</option>
-              <option value="Reviewed">Reviewed</option>
-              <option value="Approved">Approved</option>
+              <option value="Needs Review">{t.workflow.needsReview}</option>
+              <option value="Reviewed">{t.workflow.reviewed}</option>
+              <option value="Approved">{t.workflow.approved}</option>
             </select>
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Disposition</span>
+            <span className="text-xs text-muted-foreground">{t.objects.disposition}</span>
             <select
               className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               onChange={(event) => updateField("disposition", event.target.value as ObjectRecord["disposition"])}
               value={draft.disposition}
             >
-              <option value="Keep">Keep</option>
-              <option value="Sell">Sell</option>
-              <option value="Donate">Donate</option>
-              <option value="Archive">Archive</option>
+              <option value="Keep">{t.workflow.keep}</option>
+              <option value="Sell">{t.workflow.sell}</option>
+              <option value="Donate">{t.workflow.donate}</option>
+              <option value="Archive">{t.workflow.archive}</option>
             </select>
           </label>
           <label className="flex flex-col gap-1 sm:col-span-2">
-            <span className="text-xs text-muted-foreground">Kuratorische / operative Zusammenfassung</span>
+            <span className="text-xs text-muted-foreground">{t.objects.operativeSummary}</span>
             <Textarea
               onChange={(event) => updateField("aiSummary", event.target.value)}
               rows={6}
@@ -149,10 +151,10 @@ export function ObjectMetadataEditor({ objectRecord, spaceId }: ObjectMetadataEd
             />
           </label>
           <label className="flex flex-col gap-1 sm:col-span-2">
-            <span className="text-xs text-muted-foreground">Audit-Notiz</span>
+            <span className="text-xs text-muted-foreground">{t.objects.auditNoteField}</span>
             <Input
               onChange={(event) => updateField("note", event.target.value)}
-              placeholder="Warum wurde das Dossier geändert?"
+              placeholder={t.objects.auditNotePlaceholder}
               type="text"
               value={draft.note}
             />
@@ -163,7 +165,7 @@ export function ObjectMetadataEditor({ objectRecord, spaceId }: ObjectMetadataEd
             disabled={isSaving || isPending}
             onClick={() => void handleSave()}
           >
-            {isSaving || isPending ? "Speichere\u2026" : "Dossier speichern"}
+            {isSaving || isPending ? t.objects.saving : t.objects.saveDossier}
           </Button>
           {feedback ? <p className="text-sm text-[var(--success)]">{feedback}</p> : null}
           {error ? <p className="text-sm text-destructive">{error}</p> : null}

@@ -203,10 +203,10 @@ export function StageToolbar({ bridge, currentRoom, measureActive, onMeasureTogg
           className={`stage-toolbar__btn${measureActive ? " stage-toolbar__btn--active" : ""}`}
           disabled={!sdkReady}
           onClick={onMeasureToggle}
-          title="Measure"
+          title={t.measure.title}
           type="button"
         >
-          {measureActive ? "Measuring..." : "Measure"}
+          {measureActive ? t.measure.measuring : t.measure.title}
         </button>
       ) : null}
 

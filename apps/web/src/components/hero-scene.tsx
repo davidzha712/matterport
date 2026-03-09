@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Eyebrow, GlassPanel, MetricCard } from "@/components/gallery"
-import { springGentle } from "@/lib/motion"
-import type { ProjectRecord, ProviderProfile, SpaceRecord } from "@/lib/platform-types"
+import type { SpaceRecord } from "@/lib/platform-types"
 import { buildSpaceRoute } from "@/lib/routes"
+import { useT } from "@/lib/i18n"
 
 type HeroSceneProps = {
   featuredSpace?: SpaceRecord
@@ -53,6 +53,7 @@ export function HeroScene({
   spaceCount,
   totalObjects
 }: HeroSceneProps) {
+  const t = useT()
   return (
     <section className="noise vignette relative flex min-h-svh items-end overflow-hidden px-6 pb-12 pt-24 lg:px-12 lg:pb-16 lg:pt-32">
       {/* Layered background */}
@@ -71,45 +72,44 @@ export function HeroScene({
         {/* Left: Copy */}
         <div className="flex flex-col justify-end gap-6">
           <motion.div variants={revealUp}>
-            <Eyebrow>Immersive Knowledge Platform</Eyebrow>
+            <Eyebrow>{t.hero.eyebrow}</Eyebrow>
           </motion.div>
 
           <motion.h1
             className="max-w-[12ch] font-[family-name:var(--font-display)] text-[clamp(2.4rem,5vw,5rem)] font-semibold leading-[0.95] tracking-tight"
             variants={revealUp}
           >
-            Raeume werden zu Wissensbuehnen.
+            {t.hero.headline}
           </motion.h1>
 
           <motion.h2
             className="max-w-[22ch] font-[family-name:var(--font-display)] text-[clamp(1.2rem,2.2vw,2rem)] font-normal leading-tight text-[var(--text-muted)]"
             variants={revealUp}
           >
-            Matterport als digitaler Zwilling, KI als Wissensschicht, Menschen als Entscheider.
+            {t.hero.subheadline}
           </motion.h2>
 
           <motion.p
             className="max-w-xl text-sm leading-relaxed text-[var(--text-muted)]"
             variants={revealUp}
           >
-            Immersive Nachlass- und Sammlungsraeume: 3D-Begehung, multimodale Objekterkennung,
-            kuratorische Workflows und pruefbare KI-Empfehlungen in einem einzigen System.
+            {t.hero.body}
           </motion.p>
 
           <motion.div className="flex flex-wrap gap-3" variants={revealUp}>
             {featuredSpace ? (
               <Button render={<Link href={buildSpaceRoute(featuredSpace.id)} />}>
-                Digitalen Zwilling betreten
+                {t.hero.enterDigitalTwin}
               </Button>
             ) : null}
             <Button variant="outline" render={<Link href="/review-center" />}>
-              Review Center
+              {t.hero.reviewCenter}
             </Button>
             <Button variant="outline" render={<Link href="/export-center" />}>
-              Export
+              {t.hero.exportCenter}
             </Button>
             <Button variant="ghost" render={<Link href="/settings/providers" />}>
-              Provider
+              {t.hero.provider}
             </Button>
           </motion.div>
 
@@ -119,10 +119,10 @@ export function HeroScene({
             variants={stagger}
           >
             {[
-              { eyebrow: "Stage", title: "3D Digital Twin", body: "Vollstaendige Matterport-Begehung als primaeres Medium." },
-              { eyebrow: "KI Layer", title: "Multimodale Analyse", body: "Bild-Upload, Objekterkennung, kuratorische Texte per KI." },
-              { eyebrow: "Workflow", title: "Review First", body: "Jede KI-Empfehlung braucht menschliche Freigabe." },
-              { eyebrow: "Control", title: "Sanity CMS", body: "Spaces, Objekte und Provider im Studio verwalten." }
+              { eyebrow: t.hero.featureStageEyebrow, title: t.hero.featureStageTitle, body: t.hero.featureStageBody },
+              { eyebrow: t.hero.featureAiEyebrow, title: t.hero.featureAiTitle, body: t.hero.featureAiBody },
+              { eyebrow: t.hero.featureWorkflowEyebrow, title: t.hero.featureWorkflowTitle, body: t.hero.featureWorkflowBody },
+              { eyebrow: t.hero.featureControlEyebrow, title: t.hero.featureControlTitle, body: t.hero.featureControlBody }
             ].map((card) => (
               <motion.div
                 key={card.eyebrow}
@@ -148,16 +148,16 @@ export function HeroScene({
         >
           <motion.div className="grid grid-cols-2 gap-3" variants={stagger}>
             <motion.div variants={revealScale}>
-              <MetricCard label="Projekte" value={projectCount} />
+              <MetricCard label={t.common.projects} value={projectCount} />
             </motion.div>
             <motion.div variants={revealScale}>
-              <MetricCard label="Spaces" value={spaceCount} />
+              <MetricCard label={t.common.spaces} value={spaceCount} />
             </motion.div>
             <motion.div variants={revealScale}>
-              <MetricCard label="Review Queue" value={reviewCount} />
+              <MetricCard label={t.workflowSidebar.reviewQueue} value={reviewCount} />
             </motion.div>
             <motion.div variants={revealScale}>
-              <MetricCard label="Objekte" value={totalObjects} className="col-span-2" />
+              <MetricCard label={t.common.objects} value={totalObjects} className="col-span-2" />
             </motion.div>
           </motion.div>
 
@@ -166,19 +166,19 @@ export function HeroScene({
               <GlassPanel className="animate-glow-border flex flex-col gap-3 p-5">
                 <div className="flex items-start justify-between">
                   <div>
-                    <Eyebrow>Aktive Buehne</Eyebrow>
+                    <Eyebrow>{t.hero.activeStage}</Eyebrow>
                     <h3 className="font-[family-name:var(--font-display)] text-lg font-semibold">
                       {featuredSpace.name}
                     </h3>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="live-dot" />
-                    <Badge>Live</Badge>
+                    <Badge>{t.hero.live}</Badge>
                   </div>
                 </div>
                 <p className="text-sm text-[var(--text-muted)]">{featuredSpace.summary}</p>
                 <div className="flex flex-wrap gap-2">
-                  {["Erkunden", "Story", "Pruefen", "Listing"].map((chip) => (
+                  {[t.modes.explore, t.modes.story, t.modes.review, t.modes.listing].map((chip) => (
                     <Badge key={chip} variant="secondary">{chip}</Badge>
                   ))}
                 </div>
@@ -187,7 +187,7 @@ export function HeroScene({
                   {featuredSpace.rooms.slice(0, 3).map((room) => (
                     <li key={room.id} className="flex items-center justify-between text-sm">
                       <strong className="text-[var(--text)]">{room.name}</strong>
-                      <span className="text-xs text-[var(--text-muted)]">{room.objectIds.length} Objekte</span>
+                      <span className="text-xs text-[var(--text-muted)]">{room.objectIds.length} {t.common.objects}</span>
                     </li>
                   ))}
                 </ul>
@@ -199,9 +199,9 @@ export function HeroScene({
             className="flex items-center justify-center gap-2 text-xs text-[var(--text-muted)]"
             variants={revealUp}
           >
-            <span>{providerCount} KI-Provider konfiguriert</span>
+            <span>{t.providers.configuredCount.replace("{count}", String(providerCount))}</span>
             <span className="text-white/20">·</span>
-            <span>Schluessel nur serverseitig</span>
+            <span>{t.providers.serverSideOnly}</span>
           </motion.div>
         </motion.div>
       </motion.div>
@@ -214,7 +214,7 @@ export function HeroScene({
         transition={{ delay: 2, duration: 1 }}
       >
         <div className="animate-float flex flex-col items-center gap-1">
-          <span className="text-[10px] uppercase tracking-widest text-[var(--text-muted)]">Scroll</span>
+          <span className="text-[10px] uppercase tracking-widest text-[var(--text-muted)]">{t.hero.scrollHint}</span>
           <div className="h-8 w-[1px] bg-gradient-to-b from-[var(--accent-gold)] to-transparent" />
         </div>
       </motion.div>
