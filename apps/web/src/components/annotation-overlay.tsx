@@ -245,7 +245,13 @@ export function AnnotationOverlay({
     <GlassPanel className="annotation-overlay-panel">
       <Button
         className="w-full justify-between"
-        onClick={() => setCollapsed((prev) => !prev)}
+        onClick={() => {
+          setCollapsed((prev) => !prev)
+          if (!collapsed) {
+            setEditingId(null)
+            setEditState(null)
+          }
+        }}
         variant="ghost"
       >
         <span>Annotations</span>
@@ -459,6 +465,14 @@ export function AnnotationOverlay({
                                   value={editState.posZ}
                                 />
                               </label>
+                            </div>
+                            <div className="flex gap-2 pt-2 border-t border-border/30 sticky bottom-0 bg-card/95 backdrop-blur-sm py-2">
+                              <Button className="flex-1" onClick={() => commitEdit(annotation.id)} size="sm" variant="secondary">
+                                Save
+                              </Button>
+                              <Button className="flex-1" onClick={cancelEditing} size="sm" variant="ghost">
+                                Cancel
+                              </Button>
                             </div>
                           </div>
                         ) : (

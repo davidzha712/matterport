@@ -1632,20 +1632,25 @@ export class MatterportBridge {
     })
 
     // Tag click — find matching annotation and broadcast event
-    sdk.on(sdk.Tag.Event.CLICK, (tagSid: unknown) => {
-      const clickedTagId = String(tagSid)
-      // Find annotation that maps to this SDK tag
-      for (const [annId, tId] of this.annotationToTagId.entries()) {
-        if (tId === clickedTagId) {
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(
-              new CustomEvent("annotation-tag-clicked", { detail: { annotationId: annId } })
-            )
+    // Matterport SDK may expose Tag.Event or use string event names
+    const tagClickEvent = sdk.Tag.Event?.CLICK ?? "tag.click"
+    try {
+      sdk.on(tagClickEvent, (tagSid: unknown) => {
+        const clickedTagId = String(tagSid)
+        for (const [annId, tId] of this.annotationToTagId.entries()) {
+          if (tId === clickedTagId) {
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(
+                new CustomEvent("annotation-tag-clicked", { detail: { annotationId: annId } })
+              )
+            }
+            break
           }
-          break
         }
-      }
-    })
+      })
+    } catch {
+      // Tag click events not supported in this SDK version
+    }
 
     // Pointer intersection — real-time 3D raycast under cursor
     if (sdk.Pointer) {
