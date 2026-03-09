@@ -114,7 +114,7 @@ function ImmersiveShellInner({
 
   // Build runtime room list: prefer SDK rooms (real), merge with CMS rooms
   const runtimeRooms: RoomRecord[] = sdkRooms.length > 0
-    ? sdkRooms.map((sr) => {
+    ? sdkRooms.filter((sr) => sr.name).map((sr) => {
         const cmsMatch = space.rooms.find(
           (r) => r.name.toLowerCase() === sr.name.toLowerCase() || r.id === sr.id
         )
