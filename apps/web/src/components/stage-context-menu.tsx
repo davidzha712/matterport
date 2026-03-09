@@ -49,6 +49,28 @@ export function StageContextMenu({ spaceId, roomName }: StageContextMenuProps) {
     return unsub
   }, [bridge, status])
 
+  // Open menu at a given screen position
+  const openMenuAt = useCallback((clientX: number, clientY: number) => {
+    const margin = 8
+    const menuWidth = 260
+    const menuHeight = 200
+
+    const x =
+      clientX + menuWidth + margin > window.innerWidth
+        ? clientX - menuWidth
+        : clientX
+    const y =
+      clientY + menuHeight + margin > window.innerHeight
+        ? clientY - menuHeight
+        : clientY
+
+    setMenuPos({ x: Math.max(margin, x), y: Math.max(margin, y) })
+    setView("actions")
+    setLabel("")
+    setDescription("")
+    setFeedback(null)
+  }, [])
+
   // Handle right-click on stage shell
   useEffect(() => {
     if (status !== "sdk-connected") return
@@ -56,33 +78,63 @@ export function StageContextMenu({ spaceId, roomName }: StageContextMenuProps) {
     const handleContextMenu = (e: MouseEvent) => {
       const target = e.target as HTMLElement
       if (!target.closest(".stage-shell")) return
-
       e.preventDefault()
-
-      // Compute position, flipping if near viewport edges
-      const margin = 8
-      const menuWidth = 260
-      const menuHeight = 200
-
-      const x =
-        e.clientX + menuWidth + margin > window.innerWidth
-          ? e.clientX - menuWidth
-          : e.clientX
-      const y =
-        e.clientY + menuHeight + margin > window.innerHeight
-          ? e.clientY - menuHeight
-          : e.clientY
-
-      setMenuPos({ x: Math.max(margin, x), y: Math.max(margin, y) })
-      setView("actions")
-      setLabel("")
-      setDescription("")
-      setFeedback(null)
+      openMenuAt(e.clientX, e.clientY)
     }
 
     document.addEventListener("contextmenu", handleContextMenu)
     return () => document.removeEventListener("contextmenu", handleContextMenu)
-  }, [status])
+  }, [status, openMenuAt])
+
+  // Handle long-press (500ms) left click on stage shell
+  useEffect(() => {
+    if (status !== "sdk-connected") return
+
+    let timer: ReturnType<typeof setTimeout> | null = null
+    let startX = 0
+    let startY = 0
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if (e.button !== 0) return
+      const target = e.target as HTMLElement
+      if (!target.closest(".stage-shell") || target.closest(".stage-context-menu")) return
+
+      startX = e.clientX
+      startY = e.clientY
+      timer = setTimeout(() => {
+        openMenuAt(startX, startY)
+        timer = null
+      }, 500)
+    }
+
+    const handleMouseUp = () => {
+      if (timer) {
+        clearTimeout(timer)
+        timer = null
+      }
+    }
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!timer) return
+      // Cancel if pointer moved more than 8px (user is dragging/panning)
+      const dx = e.clientX - startX
+      const dy = e.clientY - startY
+      if (dx * dx + dy * dy > 64) {
+        clearTimeout(timer)
+        timer = null
+      }
+    }
+
+    document.addEventListener("mousedown", handleMouseDown)
+    document.addEventListener("mouseup", handleMouseUp)
+    document.addEventListener("mousemove", handleMouseMove)
+    return () => {
+      if (timer) clearTimeout(timer)
+      document.removeEventListener("mousedown", handleMouseDown)
+      document.removeEventListener("mouseup", handleMouseUp)
+      document.removeEventListener("mousemove", handleMouseMove)
+    }
+  }, [status, openMenuAt])
 
   // Close on click outside or Escape
   useEffect(() => {

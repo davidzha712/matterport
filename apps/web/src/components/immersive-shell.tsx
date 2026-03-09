@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { motion, useReducedMotion, AnimatePresence } from "framer-motion"
 import { AIProgressOverlay } from "@/components/ai-progress-overlay"
 import { CommandBar } from "@/components/command-bar"
@@ -64,6 +64,25 @@ function ImmersiveShellInner({
   const [modelName, setModelName] = useState<string | null>(null)
   const [apiObjects, setApiObjects] = useState<ObjectRecord[]>([])
   const [apiObjectCount, setApiObjectCount] = useState<number | null>(null)
+
+  // V key → auto-vision analysis in immersive mode
+  const triggerVisionAnalysis = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("auto-vision-analyze"))
+  }, [])
+
+  useEffect(() => {
+    if (!isImmersive || status !== "sdk-connected") return
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "v" || e.key === "V") {
+        e.preventDefault()
+        triggerVisionAnalysis()
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [isImmersive, status, triggerVisionAnalysis])
 
   // Fetch model details from SDK once connected
   useEffect(() => {
