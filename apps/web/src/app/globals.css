@@ -2870,7 +2870,8 @@ ul {
 .immersive-enter-btn {
   position: absolute;
   bottom: 80px;
-  right: 24px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 30;
   display: flex;
   align-items: center;
@@ -2893,7 +2894,7 @@ ul {
 .immersive-enter-btn:hover {
   background: rgba(203, 176, 110, 0.12);
   border-color: var(--accent);
-  transform: translateY(-2px);
+  transform: translateX(-50%) translateY(-2px);
 }
 
 .immersive-enter-btn__icon {

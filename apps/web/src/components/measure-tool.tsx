@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useBridge } from "@/lib/bridge-context"
+import { useT } from "@/lib/i18n"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 
@@ -40,6 +41,7 @@ type MeasureToolProps = {
 
 export function MeasureTool({ active, onClose }: MeasureToolProps) {
   const { bridge, status } = useBridge()
+  const t = useT()
   const [pointA, setPointA] = useState<MeasurePoint | null>(null)
   const [cursorScreen, setCursorScreen] = useState<{ x: number; y: number } | null>(null)
   const [measurements, setMeasurements] = useState<Measurement[]>([])
@@ -179,17 +181,17 @@ export function MeasureTool({ active, onClose }: MeasureToolProps) {
       {/* HUD panel */}
       <div className="measure-tool">
         <div className="measure-tool__header">
-          <span className="measure-tool__title">Measure</span>
+          <span className="measure-tool__title">{t.measure.title}</span>
           <Button onClick={handleClose} size="sm" variant="ghost" className="h-6 px-2 text-xs">
-            Close
+            {t.common.close}
           </Button>
         </div>
 
         <div className="measure-tool__instructions">
           {!pointA ? (
-            <p>Click a surface to set point A</p>
+            <p>{t.measure.setPointA}</p>
           ) : (
-            <p>Click another surface to measure distance</p>
+            <p>{t.measure.setPointB}</p>
           )}
         </div>
 
@@ -206,10 +208,10 @@ export function MeasureTool({ active, onClose }: MeasureToolProps) {
             </ul>
             <div className="measure-tool__actions">
               <Button onClick={removeLast} size="sm" variant="ghost" className="h-6 px-2 text-xs">
-                Undo
+                {t.measure.undo}
               </Button>
               <Button onClick={clearAll} size="sm" variant="ghost" className="h-6 px-2 text-xs text-destructive">
-                Clear
+                {t.measure.clear}
               </Button>
             </div>
           </div>

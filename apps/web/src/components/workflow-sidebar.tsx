@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { getBrowserApiBaseUrl } from "@/lib/browser-api"
+import { useT } from "@/lib/i18n"
 import type { ProviderProfile } from "@/lib/platform-types"
 import { toDisplayDisposition, toDisplayObjectStatus, toDisplayPriority } from "@/lib/presentation"
 
@@ -36,6 +37,7 @@ export function WorkflowSidebar({
   providers: ProviderProfile[]
   spaceId: string
 }) {
+  const t = useT()
   const [reviewQueue, setReviewQueue] = useState<ReviewQueueItem[]>([])
   const [auditLog, setAuditLog] = useState<AuditEvent[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -86,10 +88,10 @@ export function WorkflowSidebar({
       <section className="context-card">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Review Queue</p>
-            <h2>Offene Entscheidungen</h2>
+            <p className="eyebrow">{t.workflowSidebar.reviewQueue}</p>
+            <h2>{t.workflowSidebar.openDecisions}</h2>
           </div>
-          <span className="pill pill--active">{reviewQueue.length} offen</span>
+          <span className="pill pill--active">{reviewQueue.length} {t.workflowSidebar.open}</span>
         </div>
         {error ? (
           <p className="workflow-feedback workflow-feedback--error">{error}</p>
@@ -111,34 +113,34 @@ export function WorkflowSidebar({
             ))}
           </ul>
         ) : (
-          <p>Im aktuellen Space ist keine offene Pruefung mehr vorhanden.</p>
+          <p>{t.workflowSidebar.noOpenReviews}</p>
         )}
       </section>
 
       <section className="context-card">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Workflow-Status</p>
-            <h2>Pruefregeln</h2>
+            <p className="eyebrow">{t.workflowSidebar.workflowStatus}</p>
+            <h2>{t.workflowSidebar.reviewRules}</h2>
           </div>
         </div>
         <ul className="context-list">
           <li>
             {activeProviders.length > 0
-              ? `Aktiv geroutet: ${activeProviders.map((provider) => provider.label).join(", ")}.`
-              : "Noch kein Provider aktiv verbunden."}
+              ? `${t.workflowSidebar.activelyRouted}: ${activeProviders.map((provider) => provider.label).join(", ")}.`
+              : t.workflowSidebar.noProviderActive}
           </li>
-          <li>KI-Ausgaben bleiben bis zur menschlichen Pruefung unverbindlich.</li>
-          <li>Verkauf, Spende, Archiv und Export brauchen Freigaben.</li>
-          <li>Provider-Keys liegen nur im Backend und sind projektgebunden.</li>
+          <li>{t.workflowSidebar.aiOutputNonBinding}</li>
+          <li>{t.workflowSidebar.requiresApproval}</li>
+          <li>{t.workflowSidebar.keysServerSide}</li>
         </ul>
       </section>
 
       <section className="context-card">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Audit Trail</p>
-            <h2>Letzte Aenderungen</h2>
+            <p className="eyebrow">{t.workflowSidebar.auditTrail}</p>
+            <h2>{t.workflowSidebar.recentChanges}</h2>
           </div>
         </div>
         {auditLog.length ? (
@@ -154,13 +156,13 @@ export function WorkflowSidebar({
                     {toDisplayDisposition(event.before.disposition)} →{" "}
                     {toDisplayDisposition(event.after.disposition)}
                   </span>
-                  <small>{event.note || "Keine Zusatznotiz."}</small>
+                  <small>{event.note || t.workflowSidebar.noAdditionalNote}</small>
                 </div>
               </li>
             ))}
           </ul>
         ) : (
-          <p>Noch keine verzeichneten Aenderungen in diesem Space.</p>
+          <p>{t.workflowSidebar.noChangesYet}</p>
         )}
       </section>
     </>

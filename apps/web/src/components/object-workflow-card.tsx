@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 import { getBrowserApiBaseUrl } from "@/lib/browser-api"
+import { useT } from "@/lib/i18n"
 import type { ObjectRecord } from "@/lib/platform-types"
 import { toDisplayDisposition, toDisplayObjectStatus, toToneToken } from "@/lib/presentation"
 
@@ -29,6 +30,7 @@ export function ObjectWorkflowCard({
   spaceId: string
 }) {
   const router = useRouter()
+  const t = useT()
   const [currentObject, setCurrentObject] = useState(objectRecord)
   const [note, setNote] = useState("")
   const [feedback, setFeedback] = useState<string | null>(null)
@@ -60,13 +62,13 @@ export function ObjectWorkflowCard({
 
         if (!response.ok) {
           const payload = (await response.json().catch(() => null)) as { detail?: string } | null
-          throw new Error(payload?.detail ?? "Die Aktualisierung konnte nicht gespeichert werden.")
+          throw new Error(payload?.detail ?? t.objectCard.saveFailed)
         }
 
         const payload = (await response.json()) as WorkflowUpdateResponse
         setCurrentObject(payload.objectRecord)
         setFeedback(
-          `${toDisplayDisposition(payload.objectRecord.disposition)} gespeichert. ${payload.workflow.pendingReviewCount} offene Pruefungen bleiben im Space.`
+          `${toDisplayDisposition(payload.objectRecord.disposition)} ${t.objectCard.savedFeedback} ${payload.workflow.pendingReviewCount} ${t.objectCard.openReviewsRemain}`
         )
         setNote("")
         window.dispatchEvent(new CustomEvent("workflow-updated", { detail: { spaceId } }))
@@ -77,7 +79,7 @@ export function ObjectWorkflowCard({
         setError(
           caughtError instanceof Error
             ? caughtError.message
-            : "Die Aktualisierung konnte nicht gespeichert werden."
+            : t.objectCard.saveFailed
         )
       } finally {
         setIsSaving(false)
@@ -88,14 +90,14 @@ export function ObjectWorkflowCard({
   return (
     <section className="context-card context-card--hero">
       <div className="context-card__tabs" aria-hidden="true">
-        <span className="context-tab context-tab--active">Objektebene</span>
-        <span className="context-tab">Raum</span>
-        <span className="context-tab">Workflow</span>
-        <span className="context-tab">Historie</span>
+        <span className="context-tab context-tab--active">{t.objectCard.objectLevel}</span>
+        <span className="context-tab">{t.objectCard.room}</span>
+        <span className="context-tab">{t.objectCard.workflow}</span>
+        <span className="context-tab">{t.objectCard.history}</span>
       </div>
       <div className="section-heading">
         <div>
-          <p className="eyebrow">Ausgewaehltes Objekt</p>
+          <p className="eyebrow">{t.objectCard.selectedObject}</p>
           <h2>{currentObject.title}</h2>
         </div>
         <span className={`pill pill--${toToneToken(currentObject.status)}`}>
@@ -105,39 +107,39 @@ export function ObjectWorkflowCard({
       <p>{currentObject.aiSummary}</p>
       <dl className="context-meta-grid">
         <div>
-          <dt>Typ</dt>
+          <dt>{t.objectCard.type}</dt>
           <dd>{currentObject.type}</dd>
         </div>
         <div>
-          <dt>Raum</dt>
+          <dt>{t.objectCard.room}</dt>
           <dd>{currentObject.roomName}</dd>
         </div>
         <div>
-          <dt>Disposition</dt>
+          <dt>{t.objectCard.disposition}</dt>
           <dd>{toDisplayDisposition(currentObject.disposition)}</dd>
         </div>
         <div>
-          <dt>KI-Status</dt>
-          <dd>Nur Empfehlung</dd>
+          <dt>{t.objectCard.aiStatus}</dt>
+          <dd>{t.objectCard.recommendationOnly}</dd>
         </div>
       </dl>
-      <div className="knowledge-strip" aria-label="Objektschichten">
-        <span>Metadaten aktiv</span>
-        <span>Review-first</span>
-        <span>Open Layer faehig</span>
+      <div className="knowledge-strip" aria-label={t.objectCard.objectLevel}>
+        <span>{t.objectCard.metadataActive}</span>
+        <span>{t.objectCard.reviewFirst}</span>
+        <span>{t.objectCard.openLayerCapable}</span>
       </div>
       <div className="asset-strip" aria-label="Dossier-Vorschau">
-        <div className="asset-strip__card">Frame capture</div>
-        <div className="asset-strip__card">Document scan</div>
-        <div className="asset-strip__card">Voice note</div>
+        <div className="asset-strip__card">{t.objectCard.frameCapture}</div>
+        <div className="asset-strip__card">{t.objectCard.documentScan}</div>
+        <div className="asset-strip__card">{t.objectCard.voiceNote}</div>
       </div>
       <label className="workflow-note">
-        <span className="eyebrow">Audit-Notiz</span>
+        <span className="eyebrow">{t.objectCard.auditNote}</span>
         <input
           autoComplete="off"
           name="workflow-note"
           onChange={(event) => setNote(event.target.value)}
-          placeholder="Kurze Begruendung fuer die Aenderung…"
+          placeholder={t.objectCard.auditNotePlaceholder}
           spellCheck={false}
           type="text"
           value={note}
@@ -150,7 +152,7 @@ export function ObjectWorkflowCard({
           onClick={() => updateObject("Keep")}
           type="button"
         >
-          Behalten
+          {t.objectCard.keep}
         </button>
         <button
           className="action-matrix__button action-matrix__button--sell"
@@ -158,7 +160,7 @@ export function ObjectWorkflowCard({
           onClick={() => updateObject("Sell")}
           type="button"
         >
-          Verkaufen
+          {t.objectCard.sell}
         </button>
         <button
           className="action-matrix__button action-matrix__button--donate"
@@ -166,7 +168,7 @@ export function ObjectWorkflowCard({
           onClick={() => updateObject("Donate")}
           type="button"
         >
-          Spenden
+          {t.objectCard.donate}
         </button>
         <button
           className="action-matrix__button action-matrix__button--archive"
@@ -174,7 +176,7 @@ export function ObjectWorkflowCard({
           onClick={() => updateObject("Archive")}
           type="button"
         >
-          Archivieren
+          {t.objectCard.archive}
         </button>
       </div>
       {feedback ? (
@@ -188,7 +190,7 @@ export function ObjectWorkflowCard({
         </p>
       ) : null}
       <Link className="primary-link" href={objectRoute}>
-        Objektdossier oeffnen
+        {t.objectCard.openDossier}
       </Link>
     </section>
   )

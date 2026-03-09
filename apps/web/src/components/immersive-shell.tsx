@@ -62,6 +62,7 @@ function ImmersiveShellInner({
   const [showDimensions, setShowDimensions] = useState(false)
   const [measureActive, setMeasureActive] = useState(false)
   const [modelName, setModelName] = useState<string | null>(null)
+  const [apiObjects, setApiObjects] = useState<ObjectRecord[]>([])
   const [apiObjectCount, setApiObjectCount] = useState<number | null>(null)
 
   // Fetch model details from SDK once connected
@@ -72,23 +73,29 @@ function ImmersiveShellInner({
     })
   }, [bridge, status])
 
-  // Fetch persisted object count from API
+  // Fetch persisted objects from API
   useEffect(() => {
     void fetch(`/api/objects?spaceId=${encodeURIComponent(space.id)}`)
       .then((res) => res.ok ? res.json() : null)
       .then((data) => {
-        if (data?.objects) setApiObjectCount(data.objects.length)
+        if (data?.objects) {
+          setApiObjects(data.objects as ObjectRecord[])
+          setApiObjectCount(data.objects.length)
+        }
       })
       .catch(() => {})
   }, [space.id])
 
-  // Re-fetch object count when objects are updated
+  // Re-fetch objects when updated
   useEffect(() => {
     function onUpdated() {
       void fetch(`/api/objects?spaceId=${encodeURIComponent(space.id)}`)
         .then((res) => res.ok ? res.json() : null)
         .then((data) => {
-          if (data?.objects) setApiObjectCount(data.objects.length)
+          if (data?.objects) {
+            setApiObjects(data.objects as ObjectRecord[])
+            setApiObjectCount(data.objects.length)
+          }
         })
         .catch(() => {})
     }
@@ -129,9 +136,11 @@ function ImmersiveShellInner({
 
   const focalRoom = selectedRoom ?? matchedRoom ?? sdkFallbackRoom ?? space.rooms[0]
 
-  // Match objects by room
-  const roomObjects = space.objects.filter((o) => o.roomId === focalRoom.id)
-  const focalObject = selectedObject ?? roomObjects[0] ?? space.objects[0]
+  // Match objects by room — prefer API-detected objects, fall back to data model
+  const apiRoomObjects = apiObjects.filter((o) => o.roomId === focalRoom.id || o.roomName?.toLowerCase() === focalRoom.name.toLowerCase())
+  const dataRoomObjects = space.objects.filter((o) => o.roomId === focalRoom.id)
+  const roomObjects = apiRoomObjects.length > 0 ? apiRoomObjects : dataRoomObjects
+  const focalObject = selectedObject ?? roomObjects[0] ?? apiObjects[0] ?? space.objects[0]
 
   const dur = reduceMotion ? 0 : 0.4
   const ease = [0.22, 1, 0.36, 1] as const
@@ -220,7 +229,7 @@ function ImmersiveShellInner({
               ) : modeConfig.introCardVariant === "sell-focused" ? (
                 <>
                   <p>{bridge.modelDetails?.summary ?? bridge.modelDetails?.description ?? space.summary}</p>
-                  <div className="stage-intro-card__sell-badge">Listing Prep</div>
+                  <div className="stage-intro-card__sell-badge">{t.listingPrep.badge}</div>
                 </>
               ) : (
                 <p>{bridge.modelDetails?.summary ?? bridge.modelDetails?.description ?? space.summary}</p>
@@ -321,12 +330,12 @@ function ImmersiveShellInner({
               exit={{ opacity: 0, scale: 0.8 }}
               initial={{ opacity: 0, scale: 0.8 }}
               onClick={enterImmersive}
-              title="Immersive Mode (WASD)"
+              title={`${t.immersive.immersiveMode} (WASD)`}
               transition={{ duration: 0.3, ease }}
               type="button"
             >
               <span className="immersive-enter-btn__icon" aria-hidden="true" />
-              Immersive
+              {t.immersive.immersiveMode}
             </motion.button>
           ) : null}
         </AnimatePresence>
@@ -356,7 +365,7 @@ function ImmersiveShellInner({
                       onClick={() => setShowDimensions((v) => !v)}
                       type="button"
                     >
-                      {showDimensions ? "Hide Dimensions" : "Show Dimensions"}
+                      {showDimensions ? t.immersive.hideDimensions : t.immersive.showDimensions}
                     </button>
                   ) : null}
                   {showDimensions && roomDimensions ? (
@@ -376,7 +385,7 @@ function ImmersiveShellInner({
                   </span>
                   {isTourActive ? (
                     <span className="immersive-hud__tour-badge">
-                      {autoTourState === "touring" ? "Auto Tour" : "Tour"}
+                      {autoTourState === "touring" ? t.tour.autoTour : t.tour.tourActive}
                     </span>
                   ) : null}
                 </div>

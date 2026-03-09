@@ -67,7 +67,7 @@ export function InteractionDialog({
           { r: 0.8, g: 0.69, b: 0.43 }
         ).then((tagId) => {
           if (tagId) {
-            setMessage(`Tag "${obj.title}" placed in 3D space`)
+            setMessage(`Tag "${obj.title}" — 3D`)
             setTimeout(() => setMessage(""), 3000)
           }
         })
@@ -133,7 +133,7 @@ export function InteractionDialog({
                     role="radio"
                     type="button"
                   >
-                    Visitor
+                    {t.immersive.visitor}
                   </button>
                   <button
                     aria-checked={role === "admin"}
@@ -142,7 +142,7 @@ export function InteractionDialog({
                     role="radio"
                     type="button"
                   >
-                    Admin
+                    {t.immersive.admin}
                   </button>
                 </div>
                 <button

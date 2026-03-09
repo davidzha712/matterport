@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import type { ObjectCondition, SpatialAnnotation } from "@/lib/platform-types"
 import type { MatterportBridge } from "@/lib/matterport-bridge"
+import { useT } from "@/lib/i18n"
 import { GlassPanel } from "@/components/gallery"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -81,6 +82,7 @@ export function AnnotationOverlay({
   onUpdate,
   readOnly,
 }: AnnotationOverlayProps) {
+  const t = useT()
   const [collapsed, setCollapsed] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editState, setEditState] = useState<EditingState | null>(null)
@@ -260,10 +262,10 @@ export function AnnotationOverlay({
 
   const statusLabel =
     bridgeStatus === "sdk-connected"
-      ? "SDK Connected"
+      ? t.connection.sdkConnected
       : bridgeStatus === "iframe-only"
-        ? "Iframe Only"
-        : "Disconnected"
+        ? t.connection.iframeOnly
+        : t.connection.disconnected
 
   return (
     <GlassPanel className="annotation-overlay-panel">
@@ -281,7 +283,7 @@ export function AnnotationOverlay({
         }}
         variant="ghost"
       >
-        <span>Annotations</span>
+        <span>{t.ai.annotations}</span>
         {annotations.length > 0 ? (
           <Badge variant="secondary">{annotations.length}</Badge>
         ) : null}
@@ -299,7 +301,7 @@ export function AnnotationOverlay({
                 <div className="flex flex-col gap-3">
                   <div className="flex items-center justify-between">
                     <Button onClick={cancelEditing} size="sm" variant="ghost">
-                      ← Back
+                      {t.common.back}
                     </Button>
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {annotation.createdBy === "ai" ? (
@@ -309,49 +311,49 @@ export function AnnotationOverlay({
                         <Badge variant="outline">{annotation.category}</Badge>
                       ) : null}
                       {isSaved ? (
-                        <Badge variant="outline" className="text-green-400 border-green-400/30">Saved</Badge>
+                        <Badge variant="outline" className="text-green-400 border-green-400/30">{t.annotationFields.saved}</Badge>
                       ) : null}
                     </div>
                   </div>
                   {readOnly ? (
                     <div className="flex flex-col gap-3">
                       <div className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">Label</span>
+                        <span className="text-xs text-muted-foreground">{t.annotationFields.label}</span>
                         <p className="text-sm">{editState.label || "—"}</p>
                       </div>
                       <div className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">Description</span>
+                        <span className="text-xs text-muted-foreground">{t.annotationFields.description}</span>
                         <p className="text-sm whitespace-pre-wrap">{editState.description || "—"}</p>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div className="flex flex-col gap-1">
-                          <span className="text-xs text-muted-foreground">Category</span>
+                          <span className="text-xs text-muted-foreground">{t.annotationFields.category}</span>
                           <p className="text-sm">{editState.category || "—"}</p>
                         </div>
                         <div className="flex flex-col gap-1">
-                          <span className="text-xs text-muted-foreground">Condition</span>
+                          <span className="text-xs text-muted-foreground">{t.annotationFields.condition}</span>
                           <p className="text-sm">{editState.condition || "—"}</p>
                         </div>
                       </div>
                       <div className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">Material</span>
+                        <span className="text-xs text-muted-foreground">{t.annotationFields.material}</span>
                         <p className="text-sm">{editState.material || "—"}</p>
                       </div>
                       <div className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">Era / Period</span>
+                        <span className="text-xs text-muted-foreground">{t.annotationFields.era}</span>
                         <p className="text-sm">{editState.era || "—"}</p>
                       </div>
                       <div className="grid grid-cols-3 gap-2">
                         <div className="flex flex-col gap-1">
-                          <span className="text-xs text-muted-foreground">Value Min</span>
+                          <span className="text-xs text-muted-foreground">{t.annotationFields.valueMin}</span>
                           <p className="text-sm">{editState.valueMin || "—"}</p>
                         </div>
                         <div className="flex flex-col gap-1">
-                          <span className="text-xs text-muted-foreground">Value Max</span>
+                          <span className="text-xs text-muted-foreground">{t.annotationFields.valueMax}</span>
                           <p className="text-sm">{editState.valueMax || "—"}</p>
                         </div>
                         <div className="flex flex-col gap-1">
-                          <span className="text-xs text-muted-foreground">Currency</span>
+                          <span className="text-xs text-muted-foreground">{t.annotationFields.currency}</span>
                           <p className="text-sm">{editState.valueCurrency || "—"}</p>
                         </div>
                       </div>
@@ -371,14 +373,14 @@ export function AnnotationOverlay({
                       </div>
                       <div className="flex gap-2 pt-2 border-t border-border/30 sticky bottom-0 bg-card/95 backdrop-blur-sm py-2">
                         <Button className="flex-1" onClick={cancelEditing} size="sm" variant="ghost">
-                          ← Back
+                          {t.common.back}
                         </Button>
                       </div>
                     </div>
                   ) : (
                     <div className="flex flex-col gap-3">
                       <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">Label</span>
+                        <span className="text-xs text-muted-foreground">{t.annotationFields.label}</span>
                         <Input
                           onChange={(e) => updateField("label", e.target.value)}
                           type="text"
@@ -386,7 +388,7 @@ export function AnnotationOverlay({
                         />
                       </label>
                       <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">Description</span>
+                        <span className="text-xs text-muted-foreground">{t.annotationFields.description}</span>
                         <Textarea
                           onChange={(e) => updateField("description", e.target.value)}
                           rows={2}
@@ -395,7 +397,7 @@ export function AnnotationOverlay({
                       </label>
                       <div className="grid grid-cols-2 gap-2">
                         <label className="flex flex-col gap-1">
-                          <span className="text-xs text-muted-foreground">Category</span>
+                          <span className="text-xs text-muted-foreground">{t.annotationFields.category}</span>
                           <select
                             className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none focus-visible:border-ring"
                             onChange={(e) => updateField("category", e.target.value)}
@@ -408,7 +410,7 @@ export function AnnotationOverlay({
                           </select>
                         </label>
                         <label className="flex flex-col gap-1">
-                          <span className="text-xs text-muted-foreground">Condition</span>
+                          <span className="text-xs text-muted-foreground">{t.annotationFields.condition}</span>
                           <select
                             className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none focus-visible:border-ring"
                             onChange={(e) => updateField("condition", e.target.value)}
@@ -421,7 +423,7 @@ export function AnnotationOverlay({
                         </label>
                       </div>
                       <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">Material</span>
+                        <span className="text-xs text-muted-foreground">{t.annotationFields.material}</span>
                         <Input
                           onChange={(e) => updateField("material", e.target.value)}
                           type="text"
@@ -430,7 +432,7 @@ export function AnnotationOverlay({
                         />
                       </label>
                       <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">Era / Period</span>
+                        <span className="text-xs text-muted-foreground">{t.annotationFields.era}</span>
                         <Input
                           onChange={(e) => updateField("era", e.target.value)}
                           type="text"
@@ -440,7 +442,7 @@ export function AnnotationOverlay({
                       </label>
                       <div className="grid grid-cols-3 gap-2">
                         <label className="flex flex-col gap-1">
-                          <span className="text-xs text-muted-foreground">Value Min</span>
+                          <span className="text-xs text-muted-foreground">{t.annotationFields.valueMin}</span>
                           <Input
                             inputMode="decimal"
                             onChange={(e) => updateField("valueMin", e.target.value)}
@@ -449,7 +451,7 @@ export function AnnotationOverlay({
                           />
                         </label>
                         <label className="flex flex-col gap-1">
-                          <span className="text-xs text-muted-foreground">Value Max</span>
+                          <span className="text-xs text-muted-foreground">{t.annotationFields.valueMax}</span>
                           <Input
                             inputMode="decimal"
                             onChange={(e) => updateField("valueMax", e.target.value)}
@@ -458,7 +460,7 @@ export function AnnotationOverlay({
                           />
                         </label>
                         <label className="flex flex-col gap-1">
-                          <span className="text-xs text-muted-foreground">Currency</span>
+                          <span className="text-xs text-muted-foreground">{t.annotationFields.currency}</span>
                           <select
                             className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none focus-visible:border-ring"
                             onChange={(e) => updateField("valueCurrency", e.target.value)}
@@ -502,7 +504,7 @@ export function AnnotationOverlay({
                       </div>
                       <div className="flex gap-2 pt-2 border-t border-border/30 sticky bottom-0 bg-card/95 backdrop-blur-sm py-2">
                         <Button className="flex-1" onClick={() => commitEdit(editingId)} size="sm" variant="secondary">
-                          Save
+                          {t.common.save}
                         </Button>
                         <Button
                           className="text-destructive"
@@ -510,10 +512,10 @@ export function AnnotationOverlay({
                           size="sm"
                           variant="ghost"
                         >
-                          Remove
+                          {t.annotationFields.remove}
                         </Button>
                         <Button className="flex-1" onClick={cancelEditing} size="sm" variant="ghost">
-                          Cancel
+                          {t.common.cancel}
                         </Button>
                       </div>
                     </div>
@@ -528,14 +530,14 @@ export function AnnotationOverlay({
                 <Badge variant="outline">{statusLabel}</Badge>
                 {readOnly ? null : (
                   <Button onClick={handleAdd} size="sm" variant="secondary">
-                    Add Annotation
+                    {t.ai.addAnnotation}
                   </Button>
                 )}
               </div>
 
               {annotations.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  No annotations yet. Create one manually or run AI analysis via the command bar.
+                  {t.ai.noAnnotations}
                 </p>
               ) : (
                 <ul className="flex flex-col gap-2">
@@ -571,7 +573,7 @@ export function AnnotationOverlay({
                             {readOnly ? null : (
                               <div className="flex items-center gap-1 shrink-0">
                                 {isSaved ? (
-                                  <Badge variant="outline" className="text-green-400 border-green-400/30 text-[10px]">Saved</Badge>
+                                  <Badge variant="outline" className="text-green-400 border-green-400/30 text-[10px]">{t.annotationFields.saved}</Badge>
                                 ) : isSaving ? (
                                   <Badge variant="outline" className="text-[10px]">...</Badge>
                                 ) : (
