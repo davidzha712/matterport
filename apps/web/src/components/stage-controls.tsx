@@ -107,6 +107,13 @@ export function StageControls({ spaceId }: StageControlsProps) {
     [bridge]
   )
 
+  const handleFocusTag = useCallback(
+    (tagId: string) => {
+      void bridge.navigateToTag(tagId)
+    },
+    [bridge]
+  )
+
   const handleRemoveAnnotation = useCallback(
     async (id: string) => {
       // Find the annotation to get its API objectId before removing
@@ -358,6 +365,7 @@ export function StageControls({ spaceId }: StageControlsProps) {
         annotations={annotations}
         bridgeStatus={status}
         onAdd={handleAddAnnotation}
+        onFocusTag={handleFocusTag}
         onRemove={handleRemoveAnnotation}
         onUpdate={handleUpdateAnnotation}
       />

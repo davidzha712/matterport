@@ -13,6 +13,7 @@ type AnnotationOverlayProps = {
   annotations: SpatialAnnotation[]
   bridgeStatus: "disconnected" | "iframe-only" | "sdk-connected"
   onAdd: (data: Omit<SpatialAnnotation, "id">) => void
+  onFocusTag?: (tagId: string) => void
   onRemove: (id: string) => Promise<void> | void
   onUpdate: (id: string, updates: Partial<Omit<SpatialAnnotation, "id">>) => void
 }
@@ -71,6 +72,7 @@ export function AnnotationOverlay({
   annotations,
   bridgeStatus,
   onAdd,
+  onFocusTag,
   onRemove,
   onUpdate,
 }: AnnotationOverlayProps) {
@@ -111,7 +113,10 @@ export function AnnotationOverlay({
   const startEditing = useCallback((annotation: SpatialAnnotation) => {
     setEditingId(annotation.id)
     setEditState(buildEditingState(annotation))
-  }, [])
+    if (annotation.tagId && onFocusTag) {
+      onFocusTag(annotation.tagId)
+    }
+  }, [onFocusTag])
 
   const cancelEditing = useCallback(() => {
     setEditingId(null)
