@@ -112,35 +112,42 @@ function ImmersiveShellInner({
       }
     : null
 
-  // Match SDK room name to our data model for reactive room tracking
+  // Build runtime room list: prefer SDK rooms (real), merge with CMS rooms
+  const runtimeRooms: RoomRecord[] = sdkRooms.length > 0
+    ? sdkRooms.map((sr) => {
+        const cmsMatch = space.rooms.find(
+          (r) => r.name.toLowerCase() === sr.name.toLowerCase() || r.id === sr.id
+        )
+        return cmsMatch ?? {
+          id: sr.id,
+          name: sr.name,
+          objectIds: [],
+          pendingReviewCount: 0,
+          priorityBand: "Medium" as const,
+          recommendation: "",
+          summary: "",
+        }
+      })
+    : space.rooms
+
+  // Match current SDK room to runtime room list
   const matchedRoom = sdkRoom
-    ? space.rooms.find((r) =>
+    ? runtimeRooms.find((r) =>
         (sdkRoom.name && r.name.toLowerCase() === sdkRoom.name.toLowerCase()) ||
         r.id === sdkRoom.id
       )
     : undefined
 
-  // When SDK reports a room not in data model, build a lightweight fallback
-  const sdkFallbackRoom: RoomRecord | undefined =
-    !matchedRoom && sdkRoom?.name
-      ? {
-          id: sdkRoom.id,
-          name: sdkRoom.name,
-          objectIds: [],
-          pendingReviewCount: 0,
-          priorityBand: "Medium",
-          recommendation: "",
-          summary: "",
-        }
-      : undefined
+  const focalRoom = selectedRoom ?? matchedRoom ?? runtimeRooms[0]
 
-  const focalRoom = selectedRoom ?? matchedRoom ?? sdkFallbackRoom ?? space.rooms[0]
-
-  // Match objects by room — prefer API-detected objects, fall back to data model
-  const apiRoomObjects = apiObjects.filter((o) => o.roomId === focalRoom.id || o.roomName?.toLowerCase() === focalRoom.name.toLowerCase())
-  const dataRoomObjects = space.objects.filter((o) => o.roomId === focalRoom.id)
+  // Match objects by room — only show API-detected objects or CMS objects
+  // that actually belong to this room (no mock fallback to unrelated objects)
+  const apiRoomObjects = apiObjects.filter(
+    (o) => o.roomId === focalRoom?.id || o.roomName?.toLowerCase() === focalRoom?.name.toLowerCase()
+  )
+  const dataRoomObjects = space.objects.filter((o) => o.roomId === focalRoom?.id)
   const roomObjects = apiRoomObjects.length > 0 ? apiRoomObjects : dataRoomObjects
-  const focalObject = selectedObject ?? roomObjects[0] ?? apiObjects[0] ?? space.objects[0]
+  const focalObject = selectedObject ?? roomObjects[0] ?? apiObjects[0]
 
   const dur = reduceMotion ? 0 : 0.4
   const ease = [0.22, 1, 0.36, 1] as const
@@ -235,22 +242,24 @@ function ImmersiveShellInner({
                 <p>{bridge.modelDetails?.summary ?? bridge.modelDetails?.description ?? space.summary}</p>
               )}
               <ul className="stage-intro-card__metrics">
-                <li>{sdkRooms.length > 0 ? sdkRooms.length : space.rooms.length} {t.stage.roomsCaptured}</li>
+                <li>{runtimeRooms.length} {t.stage.roomsCaptured}</li>
                 <li>{apiObjectCount ?? space.objects.length} {t.stage.objectsTracked}</li>
                 <li>{t.stage.mode}: {stageModeLabels[focusMode]}</li>
                 {modeConfig.showReviewCounts ? (
-                  <li>{space.rooms.reduce((sum, r) => sum + r.pendingReviewCount, 0)} {t.workflow.needsReview}</li>
+                  <li>{runtimeRooms.reduce((sum, r) => sum + r.pendingReviewCount, 0)} {t.workflow.needsReview}</li>
                 ) : null}
               </ul>
               {modeConfig.introCardVariant !== "compact" ? (
                 <div className="stage-highlight-rail">
-                  <div className="stage-highlight-card">
-                    <span>{t.stage.objectFocus}</span>
-                    <strong>{focalObject.title}</strong>
-                  </div>
+                  {focalObject ? (
+                    <div className="stage-highlight-card">
+                      <span>{t.stage.objectFocus}</span>
+                      <strong>{focalObject.title}</strong>
+                    </div>
+                  ) : null}
                   <div className="stage-highlight-card">
                     <span>{t.stage.roomContext}</span>
-                    <strong>{focalRoom.name}</strong>
+                    <strong>{focalRoom?.name ?? sdkRoom?.name ?? space.name}</strong>
                   </div>
                 </div>
               ) : null}
@@ -305,9 +314,9 @@ function ImmersiveShellInner({
           <div className={`stage-storyline${modeConfig.bottomChrome.storylineSize === "large" ? " stage-storyline--large" : ""}`}>
             <div>
               <p className="eyebrow">{t.stage.spatialContext}</p>
-              <strong>{focalRoom.name}</strong>
+              <strong>{focalRoom?.name ?? sdkRoom?.name ?? space.name}</strong>
             </div>
-            <p>{focalObject.title}</p>
+            {focalObject ? <p>{focalObject.title}</p> : null}
             {autoTourState === "touring" ? (
               <button
                 className="stage-storyline__auto-tour-btn"
@@ -352,7 +361,7 @@ function ImmersiveShellInner({
             >
               <div className="immersive-hud__top">
                 <div className="immersive-hud__room-info">
-                  <span className="immersive-hud__label">{sdkRoom?.name ?? focalRoom.name}</span>
+                  <span className="immersive-hud__label">{sdkRoom?.name ?? focalRoom?.name ?? space.name}</span>
                   {currentSweep ? (
                     <span className="immersive-hud__sweep">
                       Sweep: {currentSweep.sid.slice(0, 8)}

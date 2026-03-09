@@ -128,10 +128,16 @@ export function ObjectWorkflowCard({
         <span>{t.objectCard.reviewFirst}</span>
         <span>{t.objectCard.openLayerCapable}</span>
       </div>
-      <div className="asset-strip" aria-label="Dossier-Vorschau">
-        <div className="asset-strip__card">{t.objectCard.frameCapture}</div>
-        <div className="asset-strip__card">{t.objectCard.documentScan}</div>
-        <div className="asset-strip__card">{t.objectCard.voiceNote}</div>
+      <div className="asset-strip" aria-label={t.objectCard.objectLevel}>
+        <button className="asset-strip__card" disabled type="button" title={t.objectCard.comingSoon}>
+          {t.objectCard.frameCapture}
+        </button>
+        <button className="asset-strip__card" disabled type="button" title={t.objectCard.comingSoon}>
+          {t.objectCard.documentScan}
+        </button>
+        <button className="asset-strip__card" disabled type="button" title={t.objectCard.comingSoon}>
+          {t.objectCard.voiceNote}
+        </button>
       </div>
       <label className="workflow-note">
         <span className="eyebrow">{t.objectCard.auditNote}</span>
