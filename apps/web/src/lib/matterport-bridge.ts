@@ -395,11 +395,11 @@ export class MatterportBridge {
 
       await this.loadModelData()
 
-      // Hide Matterport's built-in toolbar/measurement UI
+      // Hide Matterport's built-in navigation overlay controls
       try {
-        await (this.sdk as any).Settings?.update?.({ presentationMode: true })
+        await (this.sdk as any).Tag?.toggleNavControls?.(false)
       } catch {
-        // Settings API not available in this SDK version
+        // toggleNavControls not available in this SDK version
       }
     } catch (error) {
       console.error("Matterport SDK connection failed:", error)
@@ -577,8 +577,8 @@ export class MatterportBridge {
     try {
       await this.sdk.Tour.next()
       return true
-    } catch (error) {
-      console.error("nextTourStep failed:", error)
+    } catch {
+      // Expected when another transition is active — silently ignore
       return false
     }
   }
@@ -591,8 +591,8 @@ export class MatterportBridge {
     try {
       await this.sdk.Tour.prev()
       return true
-    } catch (error) {
-      console.error("prevTourStep failed:", error)
+    } catch {
+      // Expected when another transition is active — silently ignore
       return false
     }
   }

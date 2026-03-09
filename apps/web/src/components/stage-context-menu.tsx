@@ -37,8 +37,9 @@ export function StageContextMenu({ spaceId, roomName }: StageContextMenuProps) {
   const lastIntersectionRef = useRef<PointerIntersection | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const labelInputRef = useRef<HTMLInputElement | null>(null)
+  const lastCursorRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
 
-  // Track pointer intersection from bridge
+  // Track pointer intersection from bridge (3D position under cursor)
   useEffect(() => {
     if (status !== "sdk-connected") return
 
@@ -49,21 +50,14 @@ export function StageContextMenu({ spaceId, roomName }: StageContextMenuProps) {
     return unsub
   }, [bridge, status])
 
-  const overlayRef = useRef<HTMLDivElement | null>(null)
-  const lastCursorRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
-
-  // Resolve overlay element lazily (lives as a sibling in stage-shell)
-  const getOverlay = useCallback((): HTMLDivElement | null => {
-    if (overlayRef.current) return overlayRef.current
-    const el = document.querySelector<HTMLDivElement>(".stage-interaction-overlay")
-    if (el) overlayRef.current = el
-    return el
+  // Track cursor screen position globally (for M key fallback)
+  useEffect(() => {
+    function onMove(e: MouseEvent) {
+      lastCursorRef.current = { x: e.clientX, y: e.clientY }
+    }
+    document.addEventListener("mousemove", onMove, { passive: true })
+    return () => document.removeEventListener("mousemove", onMove)
   }, [])
-
-  const restoreOverlay = useCallback(() => {
-    const overlay = getOverlay()
-    if (overlay) overlay.style.pointerEvents = "auto"
-  }, [getOverlay])
 
   // Open menu at a given screen position
   const openMenuAt = useCallback((clientX: number, clientY: number) => {
@@ -85,132 +79,67 @@ export function StageContextMenu({ spaceId, roomName }: StageContextMenuProps) {
     setLabel("")
     setDescription("")
     setFeedback(null)
-    restoreOverlay()
-  }, [restoreOverlay])
+  }, [])
 
-  // Handle right-click on interaction overlay
+  // Right-click: document-level contextmenu listener.
+  // The contextmenu event fires on the parent document even when the user
+  // right-clicks over a cross-origin iframe (target = iframe element).
+  // No overlay with pointer-events:auto needed — this preserves Matterport navigation.
   useEffect(() => {
-    if (status !== "sdk-connected") return
+    function handleContextMenu(e: MouseEvent) {
+      const target = e.target as HTMLElement
+      // Only handle right-clicks within the stage area
+      if (!target.closest(".stage-shell")) return
+      // Don't intercept right-clicks on our own UI chrome (buttons, inputs, etc.)
+      if (target.closest(".stage-toolbar, .command-bar, .context-panel, .immersive-topbar, .stage-context-menu")) return
 
-    const overlay = getOverlay()
-    if (!overlay) return
-
-    const handleContextMenu = (e: MouseEvent) => {
       e.preventDefault()
       openMenuAt(e.clientX, e.clientY)
     }
 
-    overlay.addEventListener("contextmenu", handleContextMenu)
-    return () => overlay.removeEventListener("contextmenu", handleContextMenu)
-  }, [status, openMenuAt, getOverlay])
+    document.addEventListener("contextmenu", handleContextMenu)
+    return () => document.removeEventListener("contextmenu", handleContextMenu)
+  }, [openMenuAt])
 
-  // Handle long-press (500ms) on interaction overlay
-  // On mousedown: drop overlay pointer-events so iframe gets the event,
-  // start a 500ms timer. If pointer moves >8px cancel. On fire: restore overlay & show menu.
+  // M key: open context menu at last known cursor position
   useEffect(() => {
-    if (status !== "sdk-connected") return
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key !== "m" && e.key !== "M") return
+      const target = e.target as HTMLElement
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return
 
-    const overlay = getOverlay()
-    if (!overlay) return
+      // Check if cursor is over the stage area
+      const stageShell = document.querySelector(".stage-shell")
+      if (!stageShell) return
 
-    let timer: ReturnType<typeof setTimeout> | null = null
-    let startX = 0
-    let startY = 0
+      const rect = stageShell.getBoundingClientRect()
+      const cursor = lastCursorRef.current
+      const inBounds =
+        cursor.x >= rect.left &&
+        cursor.x <= rect.right &&
+        cursor.y >= rect.top &&
+        cursor.y <= rect.bottom
 
-    const handleMouseDown = (e: MouseEvent) => {
-      if (e.button !== 0) return
-
-      startX = e.clientX
-      startY = e.clientY
-
-      // Let the iframe receive this mousedown for Matterport navigation
-      overlay.style.pointerEvents = "none"
-
-      timer = setTimeout(() => {
-        restoreOverlay()
-        openMenuAt(startX, startY)
-        timer = null
-      }, 500)
-    }
-
-    // Track movement on document (overlay has pointer-events: none during press)
-    const handleMouseMove = (e: MouseEvent) => {
-      lastCursorRef.current = { x: e.clientX, y: e.clientY }
-      if (!timer) return
-      const dx = e.clientX - startX
-      const dy = e.clientY - startY
-      if (dx * dx + dy * dy > 64) {
-        clearTimeout(timer)
-        timer = null
-      }
-    }
-
-    const handleMouseUp = () => {
-      if (timer) {
-        clearTimeout(timer)
-        timer = null
-      }
-      restoreOverlay()
-    }
-
-    overlay.addEventListener("mousedown", handleMouseDown)
-    document.addEventListener("mousemove", handleMouseMove)
-    document.addEventListener("mouseup", handleMouseUp)
-    return () => {
-      if (timer) clearTimeout(timer)
-      overlay.removeEventListener("mousedown", handleMouseDown)
-      document.removeEventListener("mousemove", handleMouseMove)
-      document.removeEventListener("mouseup", handleMouseUp)
-    }
-  }, [status, openMenuAt, getOverlay, restoreOverlay])
-
-  // Keyboard shortcut: M opens context menu at last known cursor position
-  useEffect(() => {
-    if (status !== "sdk-connected") return
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "m" || e.key === "M") {
-        const target = e.target as HTMLElement
-        // Don't trigger inside input/textarea/contenteditable
-        if (
-          target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.isContentEditable
-        ) return
-
-        const overlay = getOverlay()
-        if (!overlay) return
-
-        // Use last cursor position, fallback to center of the stage shell
-        const cursor = lastCursorRef.current
-        const rect = overlay.getBoundingClientRect()
-        const inBounds =
-          cursor.x >= rect.left &&
-          cursor.x <= rect.right &&
-          cursor.y >= rect.top &&
-          cursor.y <= rect.bottom
-
-        const x = inBounds ? cursor.x : rect.left + rect.width / 2
-        const y = inBounds ? cursor.y : rect.top + rect.height / 2
-        openMenuAt(x, y)
+      if (inBounds) {
+        openMenuAt(cursor.x, cursor.y)
       }
     }
 
     document.addEventListener("keydown", handleKeyDown)
     return () => document.removeEventListener("keydown", handleKeyDown)
-  }, [status, openMenuAt, getOverlay])
+  }, [openMenuAt])
 
   // Close on click outside or Escape
   useEffect(() => {
     if (!menuPos) return
 
-    const handleClickOutside = (e: MouseEvent) => {
+    function handleClickOutside(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuPos(null)
       }
     }
 
-    const handleKeyDown = (e: KeyboardEvent) => {
+    function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         setMenuPos(null)
       }
@@ -239,13 +168,14 @@ export function StageContextMenu({ spaceId, roomName }: StageContextMenuProps) {
     setView("add-marker")
   }, [])
 
+  const sdkConnected = status === "sdk-connected"
+
   const handleSaveMarker = useCallback(async () => {
     const intersection = lastIntersectionRef.current
-    if (!intersection || !label.trim()) return
+    if (!intersection || !label.trim() || !sdkConnected) return
 
     const position = { ...intersection.position }
 
-    // Add SDK 3D tag
     await bridge.addTag({
       label: label.trim(),
       description: description.trim(),
@@ -254,7 +184,6 @@ export function StageContextMenu({ spaceId, roomName }: StageContextMenuProps) {
       color: { r: 0.8, g: 0.69, b: 0.43 },
     })
 
-    // Track annotation locally
     bridge.addAnnotation(
       {
         label: label.trim(),
@@ -269,7 +198,7 @@ export function StageContextMenu({ spaceId, roomName }: StageContextMenuProps) {
 
     setFeedback("\u2713")
     setTimeout(closeMenu, 600)
-  }, [bridge, label, description, spaceId, roomName, closeMenu])
+  }, [bridge, label, description, spaceId, roomName, closeMenu, sdkConnected])
 
   const handleDetectObjects = useCallback(() => {
     window.dispatchEvent(new CustomEvent("auto-vision-analyze"))
@@ -278,7 +207,7 @@ export function StageContextMenu({ spaceId, roomName }: StageContextMenuProps) {
 
   const handleNavigateHere = useCallback(async () => {
     const intersection = lastIntersectionRef.current
-    if (!intersection) return
+    if (!intersection || !sdkConnected) return
 
     const targetPos = intersection.position
     const sweeps = bridge.sweeps
@@ -288,7 +217,6 @@ export function StageContextMenu({ spaceId, roomName }: StageContextMenuProps) {
       return
     }
 
-    // Find the nearest enabled sweep by Euclidean distance
     let nearestSid: string | null = null
     let nearestDist = Infinity
 
@@ -306,12 +234,12 @@ export function StageContextMenu({ spaceId, roomName }: StageContextMenuProps) {
     }
 
     closeMenu()
-  }, [bridge, closeMenu])
+  }, [bridge, closeMenu, sdkConnected])
 
-  if (!menuPos || status !== "sdk-connected") return null
+  if (!menuPos) return null
 
   const intersection = lastIntersectionRef.current
-  const hasIntersection = intersection !== null
+  const hasIntersection = intersection !== null && sdkConnected
 
   return (
     <div
@@ -398,7 +326,7 @@ export function StageContextMenu({ spaceId, roomName }: StageContextMenuProps) {
                 <button
                   className="stage-context-menu__form-btn stage-context-menu__form-btn--primary"
                   onClick={handleSaveMarker}
-                  disabled={!label.trim()}
+                  disabled={!label.trim() || !hasIntersection}
                   type="button"
                 >
                   {t.contextMenu.place}

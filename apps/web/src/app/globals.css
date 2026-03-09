@@ -3571,13 +3571,12 @@ ul {
   font-size: 0.85rem;
 }
 
-/* Stage interaction overlay — captures right-click / long-press over iframe */
+/* Stage interaction overlay — purely structural, never blocks iframe events */
 .stage-interaction-overlay {
   position: absolute;
   inset: 0;
-  z-index: 10; /* above iframe, below context menu (z-index: 9999) */
-  pointer-events: auto;
-  cursor: default;
+  z-index: 10;
+  pointer-events: none;
 }
 
 /* Stage context menu */
