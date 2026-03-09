@@ -16,6 +16,7 @@ type BridgeContextValue = {
   currentRoom: RoomData | undefined
   currentSweep: SweepData | null
   isTourActive: boolean
+  sdkRooms: ReadonlyArray<RoomData>
   status: BridgeStatus
 }
 
@@ -29,6 +30,7 @@ export function BridgeProvider({ children }: { children: ReactNode }) {
   const [currentMode, setCurrentMode] = useState<ViewMode>("inside")
   const [currentFloor, setCurrentFloor] = useState(bridge.currentFloor)
   const [isTourActive, setIsTourActive] = useState(bridge.isTourActive)
+  const [sdkRooms, setSdkRooms] = useState<ReadonlyArray<RoomData>>(bridge.rooms)
 
   useEffect(() => {
     const unsubRoom = bridge.onRoomChange((room) => {
@@ -51,6 +53,10 @@ export function BridgeProvider({ children }: { children: ReactNode }) {
       if (bridge.status !== status) {
         setStatus(bridge.status)
       }
+      // Sync SDK rooms when they become available
+      if (bridge.rooms.length !== sdkRooms.length) {
+        setSdkRooms([...bridge.rooms])
+      }
     }, 300)
 
     return () => {
@@ -61,7 +67,7 @@ export function BridgeProvider({ children }: { children: ReactNode }) {
       unsubTour()
       clearInterval(interval)
     }
-  }, [bridge, status])
+  }, [bridge, sdkRooms.length, status])
 
   const value = useMemo(
     () => ({
@@ -71,9 +77,10 @@ export function BridgeProvider({ children }: { children: ReactNode }) {
       currentRoom,
       currentSweep,
       isTourActive,
+      sdkRooms,
       status,
     }),
-    [bridge, currentFloor, currentMode, currentRoom, currentSweep, isTourActive, status]
+    [bridge, currentFloor, currentMode, currentRoom, currentSweep, isTourActive, sdkRooms, status]
   )
 
   return <BridgeContext value={value}>{children}</BridgeContext>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import type { ObjectCondition, SpatialAnnotation } from "@/lib/platform-types"
+import type { MatterportBridge } from "@/lib/matterport-bridge"
 import { GlassPanel } from "@/components/gallery"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -11,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea"
 
 type AnnotationOverlayProps = {
   annotations: SpatialAnnotation[]
+  bridge?: MatterportBridge
   bridgeStatus: "disconnected" | "iframe-only" | "sdk-connected"
   onAdd: (data: Omit<SpatialAnnotation, "id">) => void
   onFocusTag?: (tagId: string) => void
@@ -70,6 +72,7 @@ function buildDefaultAnnotation(): Omit<SpatialAnnotation, "id"> {
 
 export function AnnotationOverlay({
   annotations,
+  bridge: bridgeRef,
   bridgeStatus,
   onAdd,
   onFocusTag,
@@ -116,12 +119,21 @@ export function AnnotationOverlay({
     if (annotation.tagId && onFocusTag) {
       onFocusTag(annotation.tagId)
     }
-  }, [onFocusTag])
+    // Dim other tags in 3D view to focus on the selected one
+    if (bridgeRef) {
+      const tagId = bridgeRef.getTagIdForAnnotation(annotation.id)
+      void bridgeRef.focusTag(tagId ?? null)
+    }
+  }, [bridgeRef, onFocusTag])
 
   const cancelEditing = useCallback(() => {
     setEditingId(null)
     setEditState(null)
-  }, [])
+    // Restore all tags to full opacity
+    if (bridgeRef) {
+      void bridgeRef.unfocusAllTags()
+    }
+  }, [bridgeRef])
 
   const commitEdit = useCallback(
     (id: string) => {
@@ -154,6 +166,11 @@ export function AnnotationOverlay({
       }
 
       onUpdate(id, updates)
+
+      // Restore all tags to full opacity
+      if (bridgeRef) {
+        void bridgeRef.unfocusAllTags()
+      }
 
       // Also PATCH API if annotation is persisted
       const ann = annotations.find((a) => a.id === id)
@@ -255,6 +272,9 @@ export function AnnotationOverlay({
           if (!collapsed) {
             setEditingId(null)
             setEditState(null)
+            if (bridgeRef) {
+              void bridgeRef.unfocusAllTags()
+            }
           }
         }}
         variant="ghost"
@@ -267,250 +287,243 @@ export function AnnotationOverlay({
 
       {collapsed ? null : (
         <div className="flex flex-col gap-3 p-4 pt-0">
-          <div className="flex items-center justify-between">
-            <Badge variant="outline">{statusLabel}</Badge>
-            <Button onClick={handleAdd} size="sm" variant="secondary">
-              Add Annotation
-            </Button>
-          </div>
-
-          {annotations.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No annotations yet. Create one manually or run AI analysis via the command bar.
-            </p>
+          {/* ─── Focused Edit Mode: show only the edited annotation ─── */}
+          {editingId && editState ? (
+            (() => {
+              const annotation = annotations.find((a) => a.id === editingId)
+              if (!annotation) return null
+              const isSaved = savedIds.has(annotation.id) || annotation.savedToApi
+              return (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <Button onClick={cancelEditing} size="sm" variant="ghost">
+                      ← Back
+                    </Button>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {annotation.createdBy === "ai" ? (
+                        <Badge variant="default" title="AI-generated">AI</Badge>
+                      ) : null}
+                      {annotation.category ? (
+                        <Badge variant="outline">{annotation.category}</Badge>
+                      ) : null}
+                      {isSaved ? (
+                        <Badge variant="outline" className="text-green-400 border-green-400/30">Saved</Badge>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-3">
+                    <label className="flex flex-col gap-1">
+                      <span className="text-xs text-muted-foreground">Label</span>
+                      <Input
+                        onChange={(e) => updateField("label", e.target.value)}
+                        type="text"
+                        value={editState.label}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-xs text-muted-foreground">Description</span>
+                      <Textarea
+                        onChange={(e) => updateField("description", e.target.value)}
+                        rows={2}
+                        value={editState.description}
+                      />
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="flex flex-col gap-1">
+                        <span className="text-xs text-muted-foreground">Category</span>
+                        <select
+                          className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none focus-visible:border-ring"
+                          onChange={(e) => updateField("category", e.target.value)}
+                          value={editState.category}
+                        >
+                          <option value="">--</option>
+                          {CATEGORIES.map((c) => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="text-xs text-muted-foreground">Condition</span>
+                        <select
+                          className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none focus-visible:border-ring"
+                          onChange={(e) => updateField("condition", e.target.value)}
+                          value={editState.condition}
+                        >
+                          {CONDITIONS.map((c) => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-xs text-muted-foreground">Material</span>
+                      <Input
+                        onChange={(e) => updateField("material", e.target.value)}
+                        type="text"
+                        placeholder="e.g. Oak wood, Bronze, Silk"
+                        value={editState.material}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-xs text-muted-foreground">Era / Period</span>
+                      <Input
+                        onChange={(e) => updateField("era", e.target.value)}
+                        type="text"
+                        placeholder="e.g. 18th Century, Art Deco"
+                        value={editState.era}
+                      />
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <label className="flex flex-col gap-1">
+                        <span className="text-xs text-muted-foreground">Value Min</span>
+                        <Input
+                          inputMode="decimal"
+                          onChange={(e) => updateField("valueMin", e.target.value)}
+                          type="text"
+                          value={editState.valueMin}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="text-xs text-muted-foreground">Value Max</span>
+                        <Input
+                          inputMode="decimal"
+                          onChange={(e) => updateField("valueMax", e.target.value)}
+                          type="text"
+                          value={editState.valueMax}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="text-xs text-muted-foreground">Currency</span>
+                        <select
+                          className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none focus-visible:border-ring"
+                          onChange={(e) => updateField("valueCurrency", e.target.value)}
+                          value={editState.valueCurrency}
+                        >
+                          <option value="EUR">EUR</option>
+                          <option value="USD">USD</option>
+                          <option value="GBP">GBP</option>
+                          <option value="CNY">CNY</option>
+                        </select>
+                      </label>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <label className="flex flex-col gap-1">
+                        <span className="text-xs text-muted-foreground">X</span>
+                        <Input
+                          inputMode="decimal"
+                          onChange={(e) => updateField("posX", e.target.value)}
+                          type="text"
+                          value={editState.posX}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="text-xs text-muted-foreground">Y</span>
+                        <Input
+                          inputMode="decimal"
+                          onChange={(e) => updateField("posY", e.target.value)}
+                          type="text"
+                          value={editState.posY}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="text-xs text-muted-foreground">Z</span>
+                        <Input
+                          inputMode="decimal"
+                          onChange={(e) => updateField("posZ", e.target.value)}
+                          type="text"
+                          value={editState.posZ}
+                        />
+                      </label>
+                    </div>
+                    <div className="flex gap-2 pt-2 border-t border-border/30 sticky bottom-0 bg-card/95 backdrop-blur-sm py-2">
+                      <Button className="flex-1" onClick={() => commitEdit(editingId)} size="sm" variant="secondary">
+                        Save
+                      </Button>
+                      <Button
+                        className="text-destructive"
+                        onClick={() => { cancelEditing(); void onRemove(annotation.id) }}
+                        size="sm"
+                        variant="ghost"
+                      >
+                        Remove
+                      </Button>
+                      <Button className="flex-1" onClick={cancelEditing} size="sm" variant="ghost">
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })()
           ) : (
-            <ul className="flex flex-col gap-3">
-              {annotations.map((annotation) => {
-                const isEditing = editingId === annotation.id && editState !== null
-                const isSaving = savingIds.has(annotation.id)
-                const isSaved = savedIds.has(annotation.id) || annotation.savedToApi
+            /* ─── List Mode: show all annotations ─── */
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <Badge variant="outline">{statusLabel}</Badge>
+                <Button onClick={handleAdd} size="sm" variant="secondary">
+                  Add Annotation
+                </Button>
+              </div>
 
-                return (
-                  <li id={`ann-${annotation.id}`} key={annotation.id}>
-                    <Card size="sm">
-                      <CardHeader className="flex-row items-center justify-between gap-2">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {annotation.createdBy === "ai" ? (
-                            <Badge variant="default" title="AI-generated">
-                              AI
-                            </Badge>
-                          ) : null}
-                          {annotation.confidence != null ? (
-                            <Badge variant="secondary">
-                              {Math.round(annotation.confidence * 100)}%
-                            </Badge>
-                          ) : null}
-                          {annotation.category ? (
-                            <Badge variant="outline">{annotation.category}</Badge>
-                          ) : null}
-                          {isSaved ? (
-                            <Badge variant="outline" className="text-green-400 border-green-400/30">Saved</Badge>
-                          ) : null}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          {isEditing ? (
-                            <>
-                              <Button onClick={() => commitEdit(annotation.id)} size="sm" variant="ghost">
-                                Save
-                              </Button>
-                              <Button onClick={cancelEditing} size="sm" variant="ghost">
-                                Cancel
-                              </Button>
-                            </>
-                          ) : (
-                            <>
-                              <Button onClick={() => startEditing(annotation)} size="sm" variant="ghost">
-                                Edit
-                              </Button>
-                              {!isSaved ? (
+              {annotations.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No annotations yet. Create one manually or run AI analysis via the command bar.
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {annotations.map((annotation) => {
+                    const isSaving = savingIds.has(annotation.id)
+                    const isSaved = savedIds.has(annotation.id) || annotation.savedToApi
+
+                    return (
+                      <li id={`ann-${annotation.id}`} key={annotation.id}>
+                        <Card
+                          size="sm"
+                          className="cursor-pointer transition-colors hover:border-accent/30"
+                          onClick={() => startEditing(annotation)}
+                        >
+                          <CardContent className="flex items-center justify-between gap-2 py-2.5 px-3">
+                            <div className="flex flex-col gap-0.5 min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {annotation.createdBy === "ai" ? (
+                                  <Badge variant="default" title="AI-generated" className="text-[10px] px-1.5 py-0">
+                                    AI
+                                  </Badge>
+                                ) : null}
+                                <strong className="text-sm truncate">{annotation.label}</strong>
+                              </div>
+                              <div className="flex flex-wrap gap-x-2 text-xs text-muted-foreground">
+                                {annotation.category ? <span>{annotation.category}</span> : null}
+                                {annotation.roomName ? <span>{annotation.roomName}</span> : null}
+                                {annotation.confidence != null ? (
+                                  <span>{Math.round(annotation.confidence * 100)}%</span>
+                                ) : null}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {isSaved ? (
+                                <Badge variant="outline" className="text-green-400 border-green-400/30 text-[10px]">Saved</Badge>
+                              ) : isSaving ? (
+                                <Badge variant="outline" className="text-[10px]">...</Badge>
+                              ) : (
                                 <Button
-                                  disabled={isSaving}
-                                  onClick={() => void handleSaveToApi(annotation)}
+                                  onClick={(e) => { e.stopPropagation(); void handleSaveToApi(annotation) }}
                                   size="sm"
                                   variant="ghost"
+                                  className="text-xs h-6 px-2"
                                 >
-                                  {isSaving ? "..." : "Persist"}
+                                  Save
                                 </Button>
-                              ) : null}
-                              <Button
-                                className="text-destructive"
-                                onClick={() => onRemove(annotation.id)}
-                                size="sm"
-                                variant="ghost"
-                              >
-                                Remove
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </CardHeader>
-
-                      <CardContent>
-                        {isEditing ? (
-                          <div className="flex flex-col gap-3">
-                            <label className="flex flex-col gap-1">
-                              <span className="text-xs text-muted-foreground">Label</span>
-                              <Input
-                                onChange={(e) => updateField("label", e.target.value)}
-                                type="text"
-                                value={editState.label}
-                              />
-                            </label>
-                            <label className="flex flex-col gap-1">
-                              <span className="text-xs text-muted-foreground">Description</span>
-                              <Textarea
-                                onChange={(e) => updateField("description", e.target.value)}
-                                rows={2}
-                                value={editState.description}
-                              />
-                            </label>
-                            <div className="grid grid-cols-2 gap-2">
-                              <label className="flex flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">Category</span>
-                                <select
-                                  className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none focus-visible:border-ring"
-                                  onChange={(e) => updateField("category", e.target.value)}
-                                  value={editState.category}
-                                >
-                                  <option value="">--</option>
-                                  {CATEGORIES.map((c) => (
-                                    <option key={c} value={c}>{c}</option>
-                                  ))}
-                                </select>
-                              </label>
-                              <label className="flex flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">Condition</span>
-                                <select
-                                  className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none focus-visible:border-ring"
-                                  onChange={(e) => updateField("condition", e.target.value)}
-                                  value={editState.condition}
-                                >
-                                  {CONDITIONS.map((c) => (
-                                    <option key={c} value={c}>{c}</option>
-                                  ))}
-                                </select>
-                              </label>
+                              )}
                             </div>
-                            <label className="flex flex-col gap-1">
-                              <span className="text-xs text-muted-foreground">Material</span>
-                              <Input
-                                onChange={(e) => updateField("material", e.target.value)}
-                                type="text"
-                                placeholder="e.g. Oak wood, Bronze, Silk"
-                                value={editState.material}
-                              />
-                            </label>
-                            <label className="flex flex-col gap-1">
-                              <span className="text-xs text-muted-foreground">Era / Period</span>
-                              <Input
-                                onChange={(e) => updateField("era", e.target.value)}
-                                type="text"
-                                placeholder="e.g. 18th Century, Art Deco"
-                                value={editState.era}
-                              />
-                            </label>
-                            <div className="grid grid-cols-3 gap-2">
-                              <label className="flex flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">Value Min</span>
-                                <Input
-                                  inputMode="decimal"
-                                  onChange={(e) => updateField("valueMin", e.target.value)}
-                                  type="text"
-                                  value={editState.valueMin}
-                                />
-                              </label>
-                              <label className="flex flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">Value Max</span>
-                                <Input
-                                  inputMode="decimal"
-                                  onChange={(e) => updateField("valueMax", e.target.value)}
-                                  type="text"
-                                  value={editState.valueMax}
-                                />
-                              </label>
-                              <label className="flex flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">Currency</span>
-                                <select
-                                  className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none focus-visible:border-ring"
-                                  onChange={(e) => updateField("valueCurrency", e.target.value)}
-                                  value={editState.valueCurrency}
-                                >
-                                  <option value="EUR">EUR</option>
-                                  <option value="USD">USD</option>
-                                  <option value="GBP">GBP</option>
-                                  <option value="CNY">CNY</option>
-                                </select>
-                              </label>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2">
-                              <label className="flex flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">X</span>
-                                <Input
-                                  inputMode="decimal"
-                                  onChange={(e) => updateField("posX", e.target.value)}
-                                  type="text"
-                                  value={editState.posX}
-                                />
-                              </label>
-                              <label className="flex flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">Y</span>
-                                <Input
-                                  inputMode="decimal"
-                                  onChange={(e) => updateField("posY", e.target.value)}
-                                  type="text"
-                                  value={editState.posY}
-                                />
-                              </label>
-                              <label className="flex flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">Z</span>
-                                <Input
-                                  inputMode="decimal"
-                                  onChange={(e) => updateField("posZ", e.target.value)}
-                                  type="text"
-                                  value={editState.posZ}
-                                />
-                              </label>
-                            </div>
-                            <div className="flex gap-2 pt-2 border-t border-border/30 sticky bottom-0 bg-card/95 backdrop-blur-sm py-2">
-                              <Button className="flex-1" onClick={() => commitEdit(annotation.id)} size="sm" variant="secondary">
-                                Save
-                              </Button>
-                              <Button className="flex-1" onClick={cancelEditing} size="sm" variant="ghost">
-                                Cancel
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col gap-1">
-                            <strong className="text-sm">{annotation.label}</strong>
-                            {annotation.description ? (
-                              <p className="text-sm text-muted-foreground">{annotation.description}</p>
-                            ) : null}
-                            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                              {annotation.material ? <span>Material: {annotation.material}</span> : null}
-                              {annotation.condition && annotation.condition !== "Unknown" ? (
-                                <span>Condition: {annotation.condition}</span>
-                              ) : null}
-                              {annotation.estimatedValue?.min != null || annotation.estimatedValue?.max != null ? (
-                                <span>
-                                  Value: {formatValueRange(annotation.estimatedValue)}
-                                </span>
-                              ) : null}
-                            </div>
-                            <span className="text-xs text-muted-foreground">
-                              ({annotation.position.x.toFixed(2)}, {annotation.position.y.toFixed(2)}, {annotation.position.z.toFixed(2)})
-                            </span>
-                            {annotation.roomName ? (
-                              <span className="text-xs text-muted-foreground">Room: {annotation.roomName}</span>
-                            ) : null}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </li>
-                )
-              })}
-            </ul>
+                          </CardContent>
+                        </Card>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
           )}
         </div>
       )}

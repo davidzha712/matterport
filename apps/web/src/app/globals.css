@@ -2050,6 +2050,126 @@ ul {
   z-index: 6;
 }
 
+/* ─── Measurement Tool ─── */
+
+.measure-tool__capture {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  cursor: crosshair;
+}
+
+.measure-tool {
+  position: absolute;
+  bottom: calc(9rem + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 8;
+  min-width: 16rem;
+  max-width: 22rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  background: rgba(3, 7, 11, 0.88);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(202, 179, 117, 0.18);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.measure-tool__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.measure-tool__title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.measure-tool__instructions p {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.measure-tool__live {
+  display: flex;
+  justify-content: center;
+  padding: 0.5rem 0;
+}
+
+.measure-tool__results {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.measure-tool__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.measure-tool__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.25rem 0.5rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.measure-tool__item-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.measure-tool__item-value {
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.measure-tool__actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.measure-tool__point-info {
+  margin-top: 0.25rem;
+}
+
+.measure-tool__marker {
+  position: fixed;
+  z-index: 9;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #18120a;
+  font-size: 0.65rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 3px rgba(203, 176, 110, 0.3), 0 2px 8px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+
 /* ─── Floating AI Progress Overlay ─── */
 
 .ai-progress-overlay {

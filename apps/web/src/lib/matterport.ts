@@ -38,13 +38,22 @@ export function getMatterportEmbedUrl(modelSid: string): string {
     brand: "0",
     title: "0",
     help: "0",
-    gt: "1",    // guided tour enabled
-    hr: "1",    // highlight reel enabled
-    f: "1",     // fullscreen enabled
-    mls: "2",
+    gt: "0",    // guided tour button hidden (we have our own)
+    hr: "0",    // highlight reel hidden
+    f: "0",     // fullscreen button hidden
+    mls: "2",   // mattertag label style: disc
     mt: "1",    // mattertags (3D labels) enabled
-    dh: "1",    // dollhouse mode enabled
-    fp: "1",    // floorplan mode enabled
+    dh: "1",    // dollhouse mode enabled (SDK controlled)
+    fp: "1",    // floorplan mode enabled (SDK controlled)
+    nozoom: "1",  // hide zoom controls
+    pin: "0",     // disable pin
+    portal: "0",  // disable portals
+    vr: "0",      // hide VR button
+    search: "0",  // hide search
+    gs: "0",      // hide getting started
+    views: "0",   // hide views panel
+    lp: "0",      // hide labeled pins UI
+    nt: "1",      // no title bar
   }
 
   if (sdkKey) {

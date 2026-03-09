@@ -1346,6 +1346,43 @@ export class MatterportBridge {
     }
   }
 
+  async editTagOpacity(tagId: string, opacity: number): Promise<boolean> {
+    if (!this.sdk) {
+      return false
+    }
+
+    try {
+      await this.sdk.Tag.editOpacity(tagId, opacity)
+      return true
+    } catch (error) {
+      console.error("editTagOpacity failed:", error)
+      return false
+    }
+  }
+
+  /** Dim all SDK tags except the given one (for focused editing). */
+  async focusTag(activeTagId: string | null): Promise<void> {
+    for (const [annId, tagId] of this.annotationToTagId.entries()) {
+      if (activeTagId && tagId !== activeTagId) {
+        void this.editTagOpacity(tagId, 0.15)
+      } else {
+        void this.editTagOpacity(tagId, 1.0)
+      }
+    }
+  }
+
+  /** Restore all tags to full opacity. */
+  async unfocusAllTags(): Promise<void> {
+    for (const tagId of this.annotationToTagId.values()) {
+      void this.editTagOpacity(tagId, 1.0)
+    }
+  }
+
+  /** Get the tag ID associated with an annotation. */
+  getTagIdForAnnotation(annotationId: string): string | undefined {
+    return this.annotationToTagId.get(annotationId)
+  }
+
   async navigateToTag(tagId: string): Promise<boolean> {
     if (!this.sdk) {
       return false

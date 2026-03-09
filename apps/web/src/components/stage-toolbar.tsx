@@ -7,11 +7,13 @@ import { useT } from "@/lib/i18n"
 type StageToolbarProps = {
   bridge: MatterportBridge
   currentRoom?: RoomData
+  measureActive?: boolean
+  onMeasureToggle?: () => void
 }
 
 type TourState = "idle" | "playing" | "paused"
 
-export function StageToolbar({ bridge, currentRoom }: StageToolbarProps) {
+export function StageToolbar({ bridge, currentRoom, measureActive, onMeasureToggle }: StageToolbarProps) {
   const t = useT()
   const [currentMode, setCurrentMode] = useState<ViewMode>("inside")
   const [tourState, setTourState] = useState<TourState>("idle")
@@ -178,6 +180,18 @@ export function StageToolbar({ bridge, currentRoom }: StageToolbarProps) {
       >
         {t.stage.captureView}
       </button>
+
+      {onMeasureToggle ? (
+        <button
+          className={`stage-toolbar__btn${measureActive ? " stage-toolbar__btn--active" : ""}`}
+          disabled={!sdkReady}
+          onClick={onMeasureToggle}
+          title="Measure"
+          type="button"
+        >
+          {measureActive ? "Measuring..." : "Measure"}
+        </button>
+      ) : null}
 
       <button
         className="stage-toolbar__btn stage-toolbar__btn--accent"

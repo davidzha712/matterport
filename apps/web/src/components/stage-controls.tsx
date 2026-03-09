@@ -363,6 +363,7 @@ export function StageControls({ spaceId }: StageControlsProps) {
 
       <AnnotationOverlay
         annotations={annotations}
+        bridge={bridge}
         bridgeStatus={status}
         onAdd={handleAddAnnotation}
         onFocusTag={handleFocusTag}

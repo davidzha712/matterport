@@ -8,6 +8,7 @@ import { CommandBar } from "@/components/command-bar"
 import { ContextPanel } from "@/components/context-panel"
 import { InteractionDialog } from "@/components/interaction-dialog"
 import { MatterportStage } from "@/components/matterport-stage"
+import { MeasureTool } from "@/components/measure-tool"
 import { ModeRail } from "@/components/mode-rail"
 import { StageControls } from "@/components/stage-controls"
 import { StageToolbar } from "@/components/stage-toolbar"
@@ -57,6 +58,7 @@ function ImmersiveShellInner({
   } = useImmersiveMode(bridge)
   const { autoTourState, stopAutoTour } = useAutoTour(bridge, status, isTourActive)
   const [showDimensions, setShowDimensions] = useState(false)
+  const [measureActive, setMeasureActive] = useState(false)
 
   // Compute room dimensions from SDK bounds (meters)
   const roomDimensions = sdkRoom?.bounds
@@ -195,7 +197,13 @@ function ImmersiveShellInner({
         </motion.aside>
 
         <StageControls spaceId={space.id} />
-        <StageToolbar bridge={bridge} currentRoom={sdkRoom} />
+        <StageToolbar
+          bridge={bridge}
+          currentRoom={sdkRoom}
+          measureActive={measureActive}
+          onMeasureToggle={() => setMeasureActive((v) => !v)}
+        />
+        <MeasureTool active={measureActive} onClose={() => setMeasureActive(false)} />
         <AIProgressOverlay />
 
         {/* Bottom chrome */}

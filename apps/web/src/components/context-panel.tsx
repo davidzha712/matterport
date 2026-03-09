@@ -17,7 +17,7 @@ type ContextPanelProps = {
 }
 
 export function ContextPanel({ providers, selectedObject, selectedRoom, space }: ContextPanelProps) {
-  const { bridge, status, currentRoom: sdkRoom } = useBridge()
+  const { bridge, status, currentRoom: sdkRoom, sdkRooms } = useBridge()
   const t = useT()
   const [detectedObjects, setDetectedObjects] = useState<ObjectRecord[]>([])
 
@@ -90,22 +90,49 @@ export function ContextPanel({ providers, selectedObject, selectedRoom, space }:
           <li>{focalRoom.recommendation}</li>
         </ul>
 
-        {space.rooms.length > 1 ? (
+        {/* Show SDK rooms when available, fall back to data model rooms */}
+        {(sdkRooms.length > 0 || space.rooms.length > 1) ? (
           <div className="context-card__rooms">
-            <p className="eyebrow">{t.common.rooms}</p>
+            <p className="eyebrow">
+              {t.common.rooms}
+              {sdkRooms.length > 0 ? ` (${sdkRooms.length})` : ""}
+            </p>
             <ul className="context-room-list">
-              {space.rooms.map((room) => (
-                <li key={room.id}>
-                  <Link
-                    className={`context-room-link${room.id === focalRoom.id ? " context-room-link--active" : ""}`}
-                    href={buildRoomRoute(space.id, room.id)}
-                    onClick={(e) => handleRoomClick(e, room.id)}
-                  >
-                    <span>{room.name}</span>
-                    <small>{room.objectIds.length} {t.common.objects.toLowerCase()}</small>
-                  </Link>
-                </li>
-              ))}
+              {sdkRooms.length > 0
+                ? sdkRooms.map((room) => {
+                    const dataRoom = space.rooms.find(
+                      (r) => r.name.toLowerCase() === room.name.toLowerCase() || r.id === room.id
+                    )
+                    const isActive =
+                      room.id === focalRoom.id ||
+                      (sdkRoom && room.id === sdkRoom.id) ||
+                      room.name.toLowerCase() === focalRoom.name.toLowerCase()
+                    return (
+                      <li key={room.id}>
+                        <Link
+                          className={`context-room-link${isActive ? " context-room-link--active" : ""}`}
+                          href={buildRoomRoute(space.id, dataRoom?.id ?? room.id)}
+                          onClick={(e) => handleRoomClick(e, room.id)}
+                        >
+                          <span>{room.name}</span>
+                          <small>{dataRoom ? `${dataRoom.objectIds.length} ${t.common.objects.toLowerCase()}` : "SDK"}</small>
+                        </Link>
+                      </li>
+                    )
+                  })
+                : space.rooms.map((room) => (
+                    <li key={room.id}>
+                      <Link
+                        className={`context-room-link${room.id === focalRoom.id ? " context-room-link--active" : ""}`}
+                        href={buildRoomRoute(space.id, room.id)}
+                        onClick={(e) => handleRoomClick(e, room.id)}
+                      >
+                        <span>{room.name}</span>
+                        <small>{room.objectIds.length} {t.common.objects.toLowerCase()}</small>
+                      </Link>
+                    </li>
+                  ))
+              }
             </ul>
           </div>
         ) : null}
