@@ -26,7 +26,9 @@ const getSanitySnapshot = cache(async (): Promise<SanitySnapshot | null> => {
   }
 
   try {
-    return await sanityClient.fetch<SanitySnapshot>(controlRoomSnapshotQuery)
+    return await sanityClient.fetch<SanitySnapshot>(controlRoomSnapshotQuery, {},
+      { signal: AbortSignal.timeout(4000) }
+    )
   } catch {
     return null
   }
@@ -35,7 +37,8 @@ const getSanitySnapshot = cache(async (): Promise<SanitySnapshot | null> => {
 async function getBackendProviderConfiguration(): Promise<Map<string, boolean>> {
   try {
     const response = await fetch(`${resolveServerApiBaseUrl()}/api/v1/providers`, {
-      cache: "no-store"
+      cache: "no-store",
+      signal: AbortSignal.timeout(4000)
     })
 
     if (!response.ok) {

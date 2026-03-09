@@ -3570,3 +3570,106 @@ ul {
 .annotation-readonly__value {
   font-size: 0.85rem;
 }
+
+/* Stage context menu */
+.stage-context-menu {
+  position: fixed;
+  z-index: 9999;
+  min-width: 200px;
+  max-width: 300px;
+  border-radius: 12px;
+  border: 1px solid rgba(255 255 255 / 0.08);
+  background: rgba(10 16 24 / 0.92);
+  backdrop-filter: blur(20px);
+  padding: 6px;
+  box-shadow: 0 12px 40px rgba(0 0 0 / 0.5);
+  animation: ctx-menu-in 0.15s ease-out;
+}
+
+@keyframes ctx-menu-in {
+  from { opacity: 0; scale: 0.95; }
+  to { opacity: 1; scale: 1; }
+}
+
+.stage-context-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+  text-align: left;
+}
+
+.stage-context-menu__item:hover {
+  background: rgba(255 255 255 / 0.08);
+}
+
+.stage-context-menu__item:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.stage-context-menu__divider {
+  height: 1px;
+  margin: 4px 8px;
+  background: rgba(255 255 255 / 0.06);
+}
+
+.stage-context-menu__form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+}
+
+.stage-context-menu__input {
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255 255 255 / 0.1);
+  background: rgba(255 255 255 / 0.05);
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+}
+
+.stage-context-menu__input:focus {
+  border-color: var(--accent);
+}
+
+.stage-context-menu__form-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.stage-context-menu__form-btn {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255 255 255 / 0.1);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.stage-context-menu__form-btn--primary {
+  background: var(--accent);
+  color: #000;
+  border-color: transparent;
+  font-weight: 600;
+}
+
+.stage-context-menu__coord {
+  padding: 4px 12px;
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: monospace;
+}

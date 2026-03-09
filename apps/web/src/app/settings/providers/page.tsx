@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { getRuntimeProviderProfiles } from "@/lib/provider-service"
 import { toDisplayWorkflowStatus, toToneToken } from "@/lib/presentation"
 
@@ -6,26 +7,33 @@ export default async function ProviderSettingsPage() {
   const configuredCount = providers.filter((provider) => provider.configured).length
 
   return (
-    <main className="settings-shell" id="main-content">
-      <section className="section-card">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Provider-Steuerung</p>
-            <h1>Modellrouting ist konfigurierbar, aber Schluessel verlassen nie das Backend.</h1>
-          </div>
+    <main className="detail-shell" id="main-content">
+      <header className="detail-header">
+        <div>
+          <p className="eyebrow">Provider-Steuerung</p>
+          <h1>Modellrouting ist konfigurierbar, aber Schluessel verlassen nie das Backend.</h1>
           <p>
             Diese Ansicht ist der UX-Vertrag fuer Multi-Provider-Onboarding. Secrets bleiben
             serverseitig, verschluesselt und revisionsfaehig.
           </p>
         </div>
-        <div className="context-banner">
-          <p className="eyebrow">Aktueller Zustand</p>
-          <h2>{configuredCount} von {providers.length} Providern sind fuer das Routing bereit.</h2>
-          <p>
-            Fuer lokale Entwicklung reicht ein Eintrag in `.env.local`. Die UI zeigt nur
-            Verbindungsstatus, keine Keys.
-          </p>
+        <div className="detail-header__actions">
+          <Link className="button button--secondary" href="/">
+            Zur Uebersicht
+          </Link>
         </div>
+      </header>
+      <section className="section-card">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Aktueller Zustand</p>
+            <h2>{configuredCount} von {providers.length} Providern sind fuer das Routing bereit.</h2>
+          </div>
+        </div>
+        <p>
+          Fuer lokale Entwicklung reicht ein Eintrag in `.env.local`. Die UI zeigt nur
+          Verbindungsstatus, keine Keys.
+        </p>
         <div className="provider-settings-grid">
           {providers.map((provider) => (
             <article className="provider-card" key={provider.id}>

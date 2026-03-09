@@ -145,7 +145,9 @@ function ImmersiveShellInner({
   const apiRoomObjects = apiObjects.filter(
     (o) => o.roomId === focalRoom?.id || o.roomName?.toLowerCase() === focalRoom?.name.toLowerCase()
   )
-  const dataRoomObjects = space.objects.filter((o) => o.roomId === focalRoom?.id)
+  const dataRoomObjects = status !== "sdk-connected"
+    ? space.objects.filter((o) => o.roomId === focalRoom?.id)
+    : []
   const roomObjects = apiRoomObjects.length > 0 ? apiRoomObjects : dataRoomObjects
   const focalObject = selectedObject ?? roomObjects[0] ?? apiObjects[0]
 
@@ -243,7 +245,7 @@ function ImmersiveShellInner({
               )}
               <ul className="stage-intro-card__metrics">
                 <li>{runtimeRooms.length} {t.stage.roomsCaptured}</li>
-                <li>{apiObjectCount ?? space.objects.length} {t.stage.objectsTracked}</li>
+                <li>{status === "sdk-connected" ? (apiObjectCount ?? 0) : (apiObjectCount ?? space.objects.length)} {t.stage.objectsTracked}</li>
                 <li>{t.stage.mode}: {stageModeLabels[focusMode]}</li>
                 {modeConfig.showReviewCounts ? (
                   <li>{runtimeRooms.reduce((sum, r) => sum + r.pendingReviewCount, 0)} {t.workflow.needsReview}</li>
@@ -420,7 +422,7 @@ function ImmersiveShellInner({
 
         {/* Interaction dialog (Space key) */}
         <InteractionDialog
-          objects={space.objects}
+          objects={apiObjects.length > 0 ? apiObjects : (status === "sdk-connected" ? [] : space.objects)}
           onClose={() => setShowDialog(false)}
           onRoleChange={setRole}
           open={showDialog}

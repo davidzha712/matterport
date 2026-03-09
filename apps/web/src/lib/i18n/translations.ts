@@ -297,6 +297,14 @@ export const translations = {
       notAvailable: "nicht vorhanden",
       sdkKeyStatus: "SDK-Key-Status",
     },
+    contextMenu: {
+      addMarker: "Markierung setzen",
+      detectHere: "Objekte erkennen",
+      navigateHere: "Hierhin navigieren",
+      markerLabel: "Bezeichnung",
+      markerDescription: "Beschreibung (optional)",
+      place: "Setzen",
+    },
   },
   en: {
     common: {
@@ -595,6 +603,14 @@ export const translations = {
       configuredModel: "Configured model",
       notAvailable: "not available",
       sdkKeyStatus: "SDK Key Status",
+    },
+    contextMenu: {
+      addMarker: "Add marker",
+      detectHere: "Detect objects",
+      navigateHere: "Navigate here",
+      markerLabel: "Label",
+      markerDescription: "Description (optional)",
+      place: "Place",
     },
   },
 } satisfies Record<string, Record<string, Record<string, string>>>

@@ -6,6 +6,7 @@ import { getMatterportEmbedStatus, getMatterportEmbedUrl } from "@/lib/matterpor
 import { useBridge } from "@/lib/bridge-context"
 import { useT } from "@/lib/i18n"
 import type { ReactNode } from "react"
+import { StageContextMenu } from "@/components/stage-context-menu"
 
 export function MatterportStage({
   children,
@@ -59,6 +60,7 @@ export function MatterportStage({
       <div className="stage-grid" aria-hidden="true" />
       <div className="stage-atmosphere" aria-hidden="true" />
       <div className="stage-vignette" aria-hidden="true" />
+      <StageContextMenu spaceId={space.id} />
       {children}
     </section>
   )

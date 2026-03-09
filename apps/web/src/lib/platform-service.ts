@@ -29,7 +29,9 @@ const getSanitySnapshot = cache(async (): Promise<SanitySnapshot | null> => {
   }
 
   try {
-    return await sanityClient.fetch<SanitySnapshot>(controlRoomSnapshotQuery)
+    return await sanityClient.fetch<SanitySnapshot>(controlRoomSnapshotQuery, {},
+      { signal: AbortSignal.timeout(4000) }
+    )
   } catch {
     return null
   }
