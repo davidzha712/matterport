@@ -45,17 +45,17 @@ export type StageModeConfig = {
 
 export const STAGE_MODE_CONFIGS: Record<StageMode, StageModeConfig> = {
   explore: {
-    toolbar: { viewModes: true, tour: true, screenshot: true, measure: false, aiDetect: false },
+    toolbar: { viewModes: true, tour: true, screenshot: true, measure: true, aiDetect: true },
     panels: {
       leftPanel: true,
-      commandBar: false,
+      commandBar: true,
       rightPanel: true,
       objectWorkflowCard: false,
-      aiDetections: false,
+      aiDetections: true,
       workflowSidebar: false,
     },
-    annotations: "hidden",
-    immersiveHints: { showVKey: false, spaceKeyAction: "interact" },
+    annotations: "read-write",
+    immersiveHints: { showVKey: true, spaceKeyAction: "interact" },
     introCardVariant: "full",
     objectCardReadOnly: true,
     showReviewCounts: false,
@@ -81,7 +81,7 @@ export const STAGE_MODE_CONFIGS: Record<StageMode, StageModeConfig> = {
     accentClass: "mode--work",
   },
   story: {
-    toolbar: { viewModes: true, tour: true, screenshot: true, measure: false, aiDetect: false },
+    toolbar: { viewModes: true, tour: true, screenshot: true, measure: true, aiDetect: false },
     panels: {
       leftPanel: true,
       commandBar: false,
