@@ -394,6 +394,13 @@ export class MatterportBridge {
       await new Promise((r) => setTimeout(r, 2000))
 
       await this.loadModelData()
+
+      // Hide Matterport's built-in toolbar/measurement UI
+      try {
+        await (this.sdk as any).Settings?.update?.({ presentationMode: true })
+      } catch {
+        // Settings API not available in this SDK version
+      }
     } catch (error) {
       console.error("Matterport SDK connection failed:", error)
     }

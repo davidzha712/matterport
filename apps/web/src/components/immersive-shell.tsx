@@ -65,10 +65,19 @@ function ImmersiveShellInner({
   const [apiObjects, setApiObjects] = useState<ObjectRecord[]>([])
   const [apiObjectCount, setApiObjectCount] = useState<number | null>(null)
 
-  // V key → auto-vision analysis in immersive mode
-  const triggerVisionAnalysis = useCallback(() => {
-    window.dispatchEvent(new CustomEvent("auto-vision-analyze"))
-  }, [])
+  // V key → capture screenshot then auto-vision analysis in immersive mode
+  const triggerVisionAnalysis = useCallback(async () => {
+    const dataUrl = await bridge.captureScreenshot()
+    if (dataUrl) {
+      window.dispatchEvent(
+        new CustomEvent("matterport-screenshot", { detail: { dataUrl } })
+      )
+      // Wait for command-bar to process the screenshot attachment
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("auto-vision-analyze"))
+      }, 400)
+    }
+  }, [bridge])
 
   useEffect(() => {
     if (!isImmersive || status !== "sdk-connected") return

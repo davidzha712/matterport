@@ -45,6 +45,7 @@ export function getMatterportEmbedUrl(modelSid: string): string {
     mt: "1",    // mattertags (3D labels) enabled
     dh: "1",    // dollhouse mode enabled (SDK controlled)
     fp: "1",    // floorplan mode enabled (SDK controlled)
+    ts: "0",      // hide toolbar strip (bottom-left controls including measurement)
     nozoom: "1",  // hide zoom controls
     pin: "0",     // disable pin
     portal: "0",  // disable portals

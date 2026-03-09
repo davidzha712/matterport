@@ -57,6 +57,7 @@ export function MatterportStage({
           </div>
         </div>
       )}
+      <div className="stage-interaction-overlay" aria-hidden="true" />
       <div className="stage-grid" aria-hidden="true" />
       <div className="stage-atmosphere" aria-hidden="true" />
       <div className="stage-vignette" aria-hidden="true" />

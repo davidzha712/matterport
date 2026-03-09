@@ -49,6 +49,22 @@ export function StageContextMenu({ spaceId, roomName }: StageContextMenuProps) {
     return unsub
   }, [bridge, status])
 
+  const overlayRef = useRef<HTMLDivElement | null>(null)
+  const lastCursorRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
+
+  // Resolve overlay element lazily (lives as a sibling in stage-shell)
+  const getOverlay = useCallback((): HTMLDivElement | null => {
+    if (overlayRef.current) return overlayRef.current
+    const el = document.querySelector<HTMLDivElement>(".stage-interaction-overlay")
+    if (el) overlayRef.current = el
+    return el
+  }, [])
+
+  const restoreOverlay = useCallback(() => {
+    const overlay = getOverlay()
+    if (overlay) overlay.style.pointerEvents = "auto"
+  }, [getOverlay])
+
   // Open menu at a given screen position
   const openMenuAt = useCallback((clientX: number, clientY: number) => {
     const margin = 8
@@ -69,26 +85,33 @@ export function StageContextMenu({ spaceId, roomName }: StageContextMenuProps) {
     setLabel("")
     setDescription("")
     setFeedback(null)
-  }, [])
+    restoreOverlay()
+  }, [restoreOverlay])
 
-  // Handle right-click on stage shell
+  // Handle right-click on interaction overlay
   useEffect(() => {
     if (status !== "sdk-connected") return
 
+    const overlay = getOverlay()
+    if (!overlay) return
+
     const handleContextMenu = (e: MouseEvent) => {
-      const target = e.target as HTMLElement
-      if (!target.closest(".stage-shell")) return
       e.preventDefault()
       openMenuAt(e.clientX, e.clientY)
     }
 
-    document.addEventListener("contextmenu", handleContextMenu)
-    return () => document.removeEventListener("contextmenu", handleContextMenu)
-  }, [status, openMenuAt])
+    overlay.addEventListener("contextmenu", handleContextMenu)
+    return () => overlay.removeEventListener("contextmenu", handleContextMenu)
+  }, [status, openMenuAt, getOverlay])
 
-  // Handle long-press (500ms) left click on stage shell
+  // Handle long-press (500ms) on interaction overlay
+  // On mousedown: drop overlay pointer-events so iframe gets the event,
+  // start a 500ms timer. If pointer moves >8px cancel. On fire: restore overlay & show menu.
   useEffect(() => {
     if (status !== "sdk-connected") return
+
+    const overlay = getOverlay()
+    if (!overlay) return
 
     let timer: ReturnType<typeof setTimeout> | null = null
     let startX = 0
@@ -96,27 +119,24 @@ export function StageContextMenu({ spaceId, roomName }: StageContextMenuProps) {
 
     const handleMouseDown = (e: MouseEvent) => {
       if (e.button !== 0) return
-      const target = e.target as HTMLElement
-      if (!target.closest(".stage-shell") || target.closest(".stage-context-menu")) return
 
       startX = e.clientX
       startY = e.clientY
+
+      // Let the iframe receive this mousedown for Matterport navigation
+      overlay.style.pointerEvents = "none"
+
       timer = setTimeout(() => {
+        restoreOverlay()
         openMenuAt(startX, startY)
         timer = null
       }, 500)
     }
 
-    const handleMouseUp = () => {
-      if (timer) {
-        clearTimeout(timer)
-        timer = null
-      }
-    }
-
+    // Track movement on document (overlay has pointer-events: none during press)
     const handleMouseMove = (e: MouseEvent) => {
+      lastCursorRef.current = { x: e.clientX, y: e.clientY }
       if (!timer) return
-      // Cancel if pointer moved more than 8px (user is dragging/panning)
       const dx = e.clientX - startX
       const dy = e.clientY - startY
       if (dx * dx + dy * dy > 64) {
@@ -125,16 +145,60 @@ export function StageContextMenu({ spaceId, roomName }: StageContextMenuProps) {
       }
     }
 
-    document.addEventListener("mousedown", handleMouseDown)
-    document.addEventListener("mouseup", handleMouseUp)
+    const handleMouseUp = () => {
+      if (timer) {
+        clearTimeout(timer)
+        timer = null
+      }
+      restoreOverlay()
+    }
+
+    overlay.addEventListener("mousedown", handleMouseDown)
     document.addEventListener("mousemove", handleMouseMove)
+    document.addEventListener("mouseup", handleMouseUp)
     return () => {
       if (timer) clearTimeout(timer)
-      document.removeEventListener("mousedown", handleMouseDown)
-      document.removeEventListener("mouseup", handleMouseUp)
+      overlay.removeEventListener("mousedown", handleMouseDown)
       document.removeEventListener("mousemove", handleMouseMove)
+      document.removeEventListener("mouseup", handleMouseUp)
     }
-  }, [status, openMenuAt])
+  }, [status, openMenuAt, getOverlay, restoreOverlay])
+
+  // Keyboard shortcut: M opens context menu at last known cursor position
+  useEffect(() => {
+    if (status !== "sdk-connected") return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "m" || e.key === "M") {
+        const target = e.target as HTMLElement
+        // Don't trigger inside input/textarea/contenteditable
+        if (
+          target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable
+        ) return
+
+        const overlay = getOverlay()
+        if (!overlay) return
+
+        // Use last cursor position, fallback to center of the stage shell
+        const cursor = lastCursorRef.current
+        const rect = overlay.getBoundingClientRect()
+        const inBounds =
+          cursor.x >= rect.left &&
+          cursor.x <= rect.right &&
+          cursor.y >= rect.top &&
+          cursor.y <= rect.bottom
+
+        const x = inBounds ? cursor.x : rect.left + rect.width / 2
+        const y = inBounds ? cursor.y : rect.top + rect.height / 2
+        openMenuAt(x, y)
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown)
+    return () => document.removeEventListener("keydown", handleKeyDown)
+  }, [status, openMenuAt, getOverlay])
 
   // Close on click outside or Escape
   useEffect(() => {
