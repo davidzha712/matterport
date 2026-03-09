@@ -583,7 +583,7 @@ export function AnnotationOverlay({
                                     variant="ghost"
                                     className="text-xs h-6 px-2"
                                   >
-                                    Save
+                                    {t.common.save}
                                   </Button>
                                 )}
                               </div>

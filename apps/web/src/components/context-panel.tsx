@@ -172,8 +172,8 @@ export function ContextPanel({ panelConfig, providers, selectedObject, selectedR
         <section className="context-card">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">AI Detections</p>
-              <h2>{detectedObjects.length} Objects</h2>
+              <p className="eyebrow">{t.contextPanel.aiDetections}</p>
+              <h2>{detectedObjects.length} {t.contextPanel.objects}</h2>
             </div>
           </div>
           <ul className="context-list context-list--dense">
@@ -201,7 +201,7 @@ export function ContextPanel({ panelConfig, providers, selectedObject, selectedR
           </ul>
           {detectedObjects.length > 20 ? (
             <p className="text-xs text-muted-foreground mt-2">
-              +{detectedObjects.length - 20} more objects
+              +{detectedObjects.length - 20} {t.contextPanel.moreObjects}
             </p>
           ) : null}
         </section>
@@ -215,9 +215,9 @@ export function ContextPanel({ panelConfig, providers, selectedObject, selectedR
           </div>
         </div>
         <ul className="context-list">
-          <li>Hochaufgeloestes Dossier und IIIF-Deep-Zoom sind als naechster Layer geplant.</li>
-          <li>Familiennotizen und Kuratorhinweise bekommen eigene Slots.</li>
-          <li>Jede KI-Ausgabe bleibt pruefbar und nachvollziehbar.</li>
+          <li>{t.contextPanel.dossierPlanned}</li>
+          <li>{t.contextPanel.familyNotes}</li>
+          <li>{t.contextPanel.aiVerifiable}</li>
         </ul>
       </section>
       {panelConfig?.workflowSidebar !== false ? (
