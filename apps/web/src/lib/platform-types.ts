@@ -11,15 +11,34 @@ export type ProviderProfile = {
   status: WorkflowStatus
 }
 
+export type ObjectCondition = "Excellent" | "Good" | "Fair" | "Poor" | "Unknown"
+
 export type ObjectRecord = {
   aiSummary: string
+  category?: string
+  condition?: ObjectCondition
+  confidence?: number
+  createdAt?: string
+  createdBy?: "ai" | "manual"
+  description?: string
+  dimensions?: { width?: number; height?: number; depth?: number; unit?: string }
   disposition: "Keep" | "Sell" | "Donate" | "Archive"
+  era?: string
+  estimatedValue?: { min?: number; max?: number; currency?: string }
   id: string
+  insuranceNotes?: string
+  material?: string
+  notes?: string
+  position?: { x: number; y: number; z: number }
+  provenance?: string
   roomId: string
   roomName: string
+  spaceId?: string
   status: ObjectStatus
+  tagId?: string
   title: string
   type: string
+  updatedAt?: string
 }
 
 export type RoomRecord = {
@@ -81,4 +100,13 @@ export type SpatialAnnotation = {
   objectId?: string
   createdBy: "ai" | "manual"
   confidence?: number
+  category?: string
+  material?: string
+  condition?: ObjectCondition
+  estimatedValue?: { min?: number; max?: number; currency?: string }
+  roomId?: string
+  roomName?: string
+  spaceId?: string
+  tagId?: string
+  savedToApi?: boolean
 }

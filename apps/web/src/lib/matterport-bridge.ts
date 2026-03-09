@@ -165,6 +165,7 @@ interface MpSdk {
     open: (id: string) => Promise<void>
     close: (id: string) => Promise<void>
     data: CollectionObservable<TagData>
+    Event: { CLICK: string; HOVER: string }
   }
   Mattertag: {
     navigateToTag: (tagSid: string) => Promise<void>
@@ -226,7 +227,7 @@ interface ShowcaseEmbedWindow extends Window {
 
 export type BridgeStatus = "disconnected" | "iframe-only" | "sdk-connected"
 export type ViewMode = "inside" | "dollhouse" | "floorplan"
-export type { PointerIntersection, ModelDetails, RoomData, SweepData, FloorData, TagData, TourSnapshot }
+export type { CameraPose, PointerIntersection, ModelDetails, RoomData, SweepData, FloorData, TagData, TourSnapshot }
 
 type AnnotationListener = (annotations: SpatialAnnotation[]) => void
 type SweepChangeCallback = (sweep: SweepData) => void
@@ -275,6 +276,7 @@ export class MatterportBridge {
   private _currentMode: string = ""
   private _currentFloor: { id: string; sequence: number } | undefined = undefined
   private _lastPose: CameraPose | null = null
+  private _screenshotPose: CameraPose | null = null
 
   private _sweeps: SweepData[] = []
   private _rooms: RoomData[] = []
@@ -333,6 +335,11 @@ export class MatterportBridge {
 
   get modelDetails(): ModelDetails | null {
     return this._modelDetails
+  }
+
+  /** Camera pose captured at the moment of the last screenshot. */
+  get screenshotPose(): CameraPose | null {
+    return this._screenshotPose ? { ...this._screenshotPose } : null
   }
 
   // -----------------------------------------------------------------------
@@ -416,6 +423,7 @@ export class MatterportBridge {
     this._currentMode = ""
     this._currentFloor = undefined
     this._lastPose = null
+    this._screenshotPose = null
     this._sweeps = []
     this._rooms = []
     this._floors = []
@@ -645,7 +653,10 @@ export class MatterportBridge {
   // Annotations (local state + optional SDK tag sync)
   // -----------------------------------------------------------------------
 
-  addAnnotation(data: Omit<SpatialAnnotation, "id">): SpatialAnnotation {
+  addAnnotation(
+    data: Omit<SpatialAnnotation, "id">,
+    options?: { skipTagSync?: boolean; existingTagId?: string }
+  ): SpatialAnnotation {
     const annotation: SpatialAnnotation = {
       ...data,
       id: `ann_${crypto.randomUUID().slice(0, 8)}`,
@@ -653,8 +664,14 @@ export class MatterportBridge {
     this.annotations = new Map(this.annotations).set(annotation.id, annotation)
     this.notifyAnnotationListeners()
 
-    // Sync to SDK tag if connected
-    if (this.sdk) {
+    // Track existing tag ID if provided (avoids creating a duplicate)
+    if (options?.existingTagId) {
+      this.annotationToTagId = new Map(this.annotationToTagId).set(
+        annotation.id,
+        options.existingTagId
+      )
+    } else if (!options?.skipTagSync && this.sdk) {
+      // Sync to SDK tag if connected
       const hexColor = annotation.color ?? "#ff3333"
       const rgb = hexToRgb(hexColor)
 
@@ -750,6 +767,9 @@ export class MatterportBridge {
     if (!this.sdk) {
       return null
     }
+
+    // Save camera pose atomically with screenshot — used later for 2D→3D projection
+    this._screenshotPose = this._lastPose ? { ...this._lastPose } : null
 
     // Try with requested resolution, fallback to smaller, then no-args
     const resolutions: Array<ScreenshotResolution | undefined> = [
@@ -890,6 +910,257 @@ export class MatterportBridge {
       stemVector: { x: 0, y: 0.2, z: 0 },
       color,
     })
+  }
+
+  // -----------------------------------------------------------------------
+  // 2D → 3D projection (screen coordinates to world position)
+  // -----------------------------------------------------------------------
+
+  /** Get the iframe display dimensions (needed for coordinate scaling). */
+  getIframeSize(): { width: number; height: number } | null {
+    if (!this.iframe) return null
+    return { width: this.iframe.clientWidth, height: this.iframe.clientHeight }
+  }
+
+  /**
+   * Raycast from a 2D screen pixel coordinate into the 3D scene.
+   * Returns the first mesh intersection point, or null if the ray
+   * doesn't hit any geometry.
+   */
+  async screenToWorld(
+    screenX: number,
+    screenY: number
+  ): Promise<Vector3 | null> {
+    if (!this.sdk) return null
+
+    try {
+      const data = await this.sdk.Renderer.getWorldPositionData({ x: screenX, y: screenY })
+      return data.position
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * Convert a VLM bounding box center to a 3D world position.
+   *
+   * @param savedPose — Camera pose captured at screenshot time. When provided
+   *   and the camera has moved since, raycast is skipped (it would hit the
+   *   wrong surface) and mathematical projection is used instead.
+   *
+   * Pipeline:
+   *   A. Camera unchanged → raycast center → multi-point sample → math fallback
+   *   B. Camera moved → math projection using savedPose (PRIMARY)
+   */
+  async bboxToWorldPosition(
+    bbox: [number, number, number, number],
+    screenshotRes: { width: number; height: number },
+    savedPose?: CameraPose | null
+  ): Promise<Vector3 | null> {
+    const effectivePose = savedPose ?? this._screenshotPose ?? this._lastPose
+    if (!effectivePose) return null
+
+    // Check if camera has moved since screenshot — if so, raycast is unreliable
+    const cameraMoved = this.hasCameraMoved(effectivePose, this._lastPose)
+
+    if (cameraMoved) {
+      // Camera moved during AI analysis — use mathematical projection with saved pose
+      return this.projectBboxWithPose(bbox, screenshotRes, effectivePose)
+    }
+
+    // Camera hasn't moved — raycast is accurate
+    const iframeSize = this.getIframeSize()
+    if (!iframeSize) return this.projectBboxWithPose(bbox, screenshotRes, effectivePose)
+
+    const scaleX = iframeSize.width / screenshotRes.width
+    const scaleY = iframeSize.height / screenshotRes.height
+
+    const [x1, y1, x2, y2] = bbox
+    const centerX = ((x1 + x2) / 2) * scaleX
+    const centerY = ((y1 + y2) / 2) * scaleY
+
+    // Try center point raycast
+    const centerHit = await this.screenToWorld(centerX, centerY)
+    if (centerHit) return centerHit
+
+    // Multi-point sampling within the bbox
+    const bboxW = (x2 - x1) * scaleX
+    const bboxH = (y2 - y1) * scaleY
+    const sampleOffsets = [
+      { dx: -0.25, dy: 0 },
+      { dx: 0.25, dy: 0 },
+      { dx: 0, dy: -0.25 },
+      { dx: 0, dy: 0.25 },
+      { dx: -0.2, dy: -0.2 },
+      { dx: 0.2, dy: 0.2 },
+    ]
+
+    const hits: Vector3[] = []
+    for (const { dx, dy } of sampleOffsets) {
+      const sx = centerX + bboxW * dx
+      const sy = centerY + bboxH * dy
+      if (sx < 0 || sy < 0 || sx > iframeSize.width || sy > iframeSize.height) continue
+      const hit = await this.screenToWorld(sx, sy)
+      if (hit) hits.push(hit)
+    }
+
+    if (hits.length > 0) {
+      return {
+        x: hits.reduce((s, h) => s + h.x, 0) / hits.length,
+        y: hits.reduce((s, h) => s + h.y, 0) / hits.length,
+        z: hits.reduce((s, h) => s + h.z, 0) / hits.length,
+      }
+    }
+
+    // All raycasts missed — mathematical fallback
+    return this.projectBboxWithPose(bbox, screenshotRes, effectivePose)
+  }
+
+  /**
+   * Compare two camera poses to determine if the camera has moved significantly.
+   * Position threshold: 0.3m, rotation threshold: 3°.
+   */
+  private hasCameraMoved(
+    savedPose: CameraPose,
+    currentPose: CameraPose | null
+  ): boolean {
+    if (!currentPose) return true
+
+    const dx = savedPose.position.x - currentPose.position.x
+    const dy = savedPose.position.y - currentPose.position.y
+    const dz = savedPose.position.z - currentPose.position.z
+    const posDist = Math.sqrt(dx * dx + dy * dy + dz * dz)
+    if (posDist > 0.3) return true
+
+    const yawDiff = Math.abs(savedPose.rotation.x - currentPose.rotation.x)
+    const pitchDiff = Math.abs(savedPose.rotation.y - currentPose.rotation.y)
+    if (yawDiff > 3 || pitchDiff > 3) return true
+
+    return false
+  }
+
+  /**
+   * Pinhole camera projection: cast a ray from the saved camera pose
+   * through the bbox center and intersect with room geometry or place
+   * at an estimated depth.
+   */
+  private projectBboxWithPose(
+    bbox: [number, number, number, number],
+    screenshotRes: { width: number; height: number },
+    pose: CameraPose
+  ): Vector3 | null {
+    const [x1, y1, x2, y2] = bbox
+    const { width, height } = screenshotRes
+
+    // Normalize bbox center to NDC [-1, 1]
+    const ndcX = (2.0 * ((x1 + x2) / 2) / width) - 1.0
+    const ndcY = 1.0 - (2.0 * ((y1 + y2) / 2) / height)
+
+    // Camera intrinsics estimate (Matterport vertical FOV ≈ 60°)
+    const fovRad = (60 * Math.PI) / 180
+    const tanHalfFov = Math.tan(fovRad / 2)
+    const aspect = width / height
+
+    // Camera-space ray direction
+    const dirCamX = ndcX * aspect * tanHalfFov
+    const dirCamY = ndcY * tanHalfFov
+    const dirCamZ = -1.0
+
+    // Rotate to world space: yaw (rotation.x), pitch (rotation.y)
+    const yaw = (pose.rotation.x * Math.PI) / 180
+    const pitch = (pose.rotation.y * Math.PI) / 180
+    const cosY = Math.cos(yaw)
+    const sinY = Math.sin(yaw)
+    const cosP = Math.cos(pitch)
+    const sinP = Math.sin(pitch)
+
+    // Pitch around X, then yaw around Y
+    const apX = dirCamX
+    const apY = dirCamY * cosP - dirCamZ * sinP
+    const apZ = dirCamY * sinP + dirCamZ * cosP
+    const wdX = apX * cosY + apZ * sinY
+    const wdY = apY
+    const wdZ = -apX * sinY + apZ * cosY
+
+    const len = Math.sqrt(wdX * wdX + wdY * wdY + wdZ * wdZ)
+    if (len < 1e-8) return null
+
+    const dirNormX = wdX / len
+    const dirNormY = wdY / len
+    const dirNormZ = wdZ / len
+
+    // Estimate depth by intersecting ray with room AABB bounds
+    const depth = this.estimateDepthFromRooms(pose.position, { x: dirNormX, y: dirNormY, z: dirNormZ })
+
+    return {
+      x: pose.position.x + dirNormX * depth,
+      y: pose.position.y + dirNormY * depth,
+      z: pose.position.z + dirNormZ * depth,
+    }
+  }
+
+  /**
+   * Estimate ray depth by intersecting with known room AABB bounds.
+   * Returns the nearest valid intersection distance, or a default of 2.5m.
+   */
+  private estimateDepthFromRooms(
+    origin: Vector3,
+    dir: Vector3
+  ): number {
+    const DEFAULT_DEPTH = 2.5
+    if (this._rooms.length === 0) return DEFAULT_DEPTH
+
+    let bestT = Infinity
+
+    for (const room of this._rooms) {
+      if (!room.bounds?.min || !room.bounds?.max) continue
+      const t = this.rayAABBIntersect(origin, dir, room.bounds.min, room.bounds.max)
+      if (t !== null && t > 0.2 && t < bestT) {
+        bestT = t
+      }
+    }
+
+    return bestT < Infinity ? bestT : DEFAULT_DEPTH
+  }
+
+  /**
+   * Ray-AABB slab intersection test.
+   * Returns the distance along the ray to the nearest intersection, or null.
+   */
+  private rayAABBIntersect(
+    origin: Vector3,
+    dir: Vector3,
+    bmin: Vector3,
+    bmax: Vector3
+  ): number | null {
+    let tmin = -Infinity
+    let tmax = Infinity
+
+    for (const axis of ["x", "y", "z"] as const) {
+      const d = dir[axis]
+      const o = origin[axis]
+      const lo = bmin[axis]
+      const hi = bmax[axis]
+
+      if (Math.abs(d) < 1e-9) {
+        if (o < lo || o > hi) return null
+        continue
+      }
+
+      let t1 = (lo - o) / d
+      let t2 = (hi - o) / d
+      if (t1 > t2) { const tmp = t1; t1 = t2; t2 = tmp }
+
+      tmin = Math.max(tmin, t1)
+      tmax = Math.min(tmax, t2)
+
+      if (tmin > tmax) return null
+    }
+
+    // Return the exit distance (the far intersection point — where the ray
+    // hits the far wall of the room). If origin is inside the AABB, tmin < 0
+    // and tmax is the exit point.
+    return tmax > 0 ? tmax : null
   }
 
   // -----------------------------------------------------------------------
@@ -1357,6 +1628,22 @@ export class MatterportBridge {
       const viewMode = this.sdkModeToViewMode(sdkMode)
       for (const cb of this.modeChangeCallbacks) {
         cb(viewMode)
+      }
+    })
+
+    // Tag click — find matching annotation and broadcast event
+    sdk.on(sdk.Tag.Event.CLICK, (tagSid: unknown) => {
+      const clickedTagId = String(tagSid)
+      // Find annotation that maps to this SDK tag
+      for (const [annId, tId] of this.annotationToTagId.entries()) {
+        if (tId === clickedTagId) {
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(
+              new CustomEvent("annotation-tag-clicked", { detail: { annotationId: annId } })
+            )
+          }
+          break
+        }
       }
     })
 

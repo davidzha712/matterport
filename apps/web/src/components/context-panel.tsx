@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useCallback } from "react"
+import { useCallback, useEffect, useState } from "react"
 import type { ObjectRecord, ProviderProfile, RoomRecord, SpaceRecord } from "@/lib/platform-types"
 import { ObjectWorkflowCard } from "@/components/object-workflow-card"
 import { WorkflowSidebar } from "@/components/workflow-sidebar"
@@ -19,6 +19,7 @@ type ContextPanelProps = {
 export function ContextPanel({ providers, selectedObject, selectedRoom, space }: ContextPanelProps) {
   const { bridge, status, currentRoom: sdkRoom } = useBridge()
   const t = useT()
+  const [detectedObjects, setDetectedObjects] = useState<ObjectRecord[]>([])
 
   // Match SDK room to our data model for reactive room tracking
   const matchedRoom = sdkRoom
@@ -30,6 +31,34 @@ export function ContextPanel({ providers, selectedObject, selectedRoom, space }:
   const focalRoom = selectedRoom ?? matchedRoom ?? space.rooms[0]
   const focalObject = selectedObject ?? space.objects.find((o) => o.roomId === focalRoom.id) ?? space.objects[0]
   const objectRoute = buildObjectRoute(space.id, focalObject.id)
+
+  // Fetch persisted AI-detected objects for the current room
+  const fetchDetectedObjects = useCallback(async () => {
+    try {
+      const params = new URLSearchParams({ spaceId: space.id })
+      if (focalRoom.id) params.set("roomId", focalRoom.id)
+      const res = await fetch(`/api/objects?${params.toString()}`)
+      if (res.ok) {
+        const data = (await res.json()) as { objects: ObjectRecord[] }
+        setDetectedObjects(data.objects)
+      }
+    } catch {
+      // Best-effort
+    }
+  }, [space.id, focalRoom.id])
+
+  useEffect(() => {
+    void fetchDetectedObjects()
+  }, [fetchDetectedObjects])
+
+  // Re-fetch when objects are updated (from stage-controls batch save)
+  useEffect(() => {
+    function onUpdated() {
+      void fetchDetectedObjects()
+    }
+    window.addEventListener("objects-updated", onUpdated)
+    return () => window.removeEventListener("objects-updated", onUpdated)
+  }, [fetchDetectedObjects])
 
   const handleRoomClick = useCallback(
     (e: React.MouseEvent, roomId: string) => {
@@ -81,6 +110,46 @@ export function ContextPanel({ providers, selectedObject, selectedRoom, space }:
           </div>
         ) : null}
       </section>
+
+      {/* AI-detected objects for current room */}
+      {detectedObjects.length > 0 ? (
+        <section className="context-card">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">AI Detections</p>
+              <h2>{detectedObjects.length} Objects</h2>
+            </div>
+          </div>
+          <ul className="context-list context-list--dense">
+            {detectedObjects.slice(0, 20).map((obj) => (
+              <li key={obj.id} className="context-detected-item">
+                <div className="context-detected-item__header">
+                  <strong>{obj.title}</strong>
+                  {obj.confidence != null ? (
+                    <span className="context-detected-item__confidence">
+                      {Math.round(obj.confidence * 100)}%
+                    </span>
+                  ) : null}
+                </div>
+                {obj.category ? <span className="context-detected-item__tag">{obj.category}</span> : null}
+                {obj.description ? (
+                  <p className="context-detected-item__desc">{obj.description}</p>
+                ) : null}
+                <div className="context-detected-item__meta">
+                  {obj.condition && obj.condition !== "Unknown" ? <span>{obj.condition}</span> : null}
+                  {obj.material ? <span>{obj.material}</span> : null}
+                  <span>{obj.status}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+          {detectedObjects.length > 20 ? (
+            <p className="text-xs text-muted-foreground mt-2">
+              +{detectedObjects.length - 20} more objects
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       <section className="context-card">
         <div className="section-heading">

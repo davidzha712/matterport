@@ -6,6 +6,7 @@ import { useBridge } from "@/lib/bridge-context"
 import { useLocale } from "@/lib/i18n"
 import { useVoiceCommands } from "@/lib/use-voice-commands"
 import { useVoiceInput } from "@/lib/use-voice-input"
+import type { CameraPose } from "@/lib/matterport-bridge"
 import type { RoomRecord, SpaceRecord } from "@/lib/platform-types"
 
 type TaskType = "vision-detect" | "narrative-summarize" | "workflow-assist"
@@ -17,7 +18,7 @@ type CommandBarProps = {
 
 type AIResponse = {
   output: {
-    structuredData: Record<string, string | number | boolean | null | string[] | undefined>
+    structuredData: Record<string, unknown>
     summary: string
     warnings: string[]
   }
@@ -34,6 +35,32 @@ type ImageAttachmentState = {
   origin: "inline-upload" | "remote-url" | "sdk-capture"
   previewUrl: string
   url: string
+}
+
+type ProgressStep = {
+  step: string
+  progress: number
+}
+
+const STEP_LABELS: Record<string, Record<string, string>> = {
+  de: {
+    init: "Vorbereitung…",
+    search: "Web-Kontext wird gesucht…",
+    vlm: "VLM-Bildanalyse…",
+    parse: "Ergebnisse werden geparst…",
+    placing: "3D-Tags werden platziert…",
+    done: "Analyse abgeschlossen",
+    error: "Analyse fehlgeschlagen",
+  },
+  en: {
+    init: "Initializing…",
+    search: "Searching web context…",
+    vlm: "Analyzing image with VLM…",
+    parse: "Parsing detection results…",
+    placing: "Placing 3D annotations…",
+    done: "Analysis complete",
+    error: "Analysis failed",
+  },
 }
 
 const acceptedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"])
@@ -63,10 +90,12 @@ export function CommandBar({ room, space }: CommandBarProps) {
     [executeCommand]
   )
   const voice = useVoiceInput(handleVoiceTranscript, { locale })
+  const [screenshotPose, setScreenshotPose] = useState<CameraPose | null>(null)
   const [imageUrl, setImageUrl] = useState("")
   const [imageAttachment, setImageAttachment] = useState<ImageAttachmentState | null>(null)
   const [isReadingImage, setIsReadingImage] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [progress, setProgress] = useState<ProgressStep | null>(null)
   const [result, setResult] = useState<AIResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -98,7 +127,7 @@ export function CommandBar({ room, space }: CommandBarProps) {
   // Listen for SDK screenshots
   useEffect(() => {
     function onScreenshot(event: Event) {
-      const detail = (event as CustomEvent<{ dataUrl: string }>).detail
+      const detail = (event as CustomEvent<{ dataUrl: string; pose?: CameraPose | null }>).detail
       if (!detail?.dataUrl) return
       setImageAttachment({
         label: t.ai.sdkScreenshot,
@@ -106,6 +135,7 @@ export function CommandBar({ room, space }: CommandBarProps) {
         previewUrl: detail.dataUrl,
         url: detail.dataUrl
       })
+      setScreenshotPose(detail.pose ?? null)
       setImageUrl("")
       if (taskType !== "vision-detect") {
         setTaskType("vision-detect")
@@ -199,6 +229,22 @@ export function CommandBar({ room, space }: CommandBarProps) {
       setError(null)
       setIsSubmitting(true)
 
+      // Helper: set local progress AND dispatch to floating overlay
+      function emitProgress(data: ProgressStep | null) {
+        setProgress(data)
+        // Defer dispatch so it doesn't trigger setState in another component during render
+        queueMicrotask(() => {
+          window.dispatchEvent(
+            new CustomEvent("ai-analysis-progress", { detail: data })
+          )
+        })
+      }
+
+      emitProgress({ step: "search", progress: 5 })
+
+      // Capture camera pose NOW (submit time) as fallback if no screenshot pose
+      const submitPose = screenshotPose ?? bridge.getCameraPose()
+
       void (async () => {
         try {
           const requestBody = {
@@ -226,26 +272,109 @@ export function CommandBar({ room, space }: CommandBarProps) {
             throw new Error(payload?.detail ?? t.ai.serviceUnavailable)
           }
 
-          const payload = (await response.json()) as AIResponse
+          // Read SSE stream for real-time progress
+          let finalResult: AIResponse | null = null
+          const reader = response.body?.getReader()
 
-          // If AI detected objects, dispatch events for 3D tag creation
-          if (payload.taskType === "vision-detect" && payload.output.structuredData) {
-            const detected = payload.output.structuredData
-            if (Array.isArray(detected.objects)) {
-              for (const obj of detected.objects) {
-                if (typeof obj === "string") {
-                  window.dispatchEvent(
-                    new CustomEvent("annotation-from-ai", {
-                      detail: { label: obj, description: payload.output.summary }
-                    })
-                  )
+          if (reader) {
+            // Start a simulated progress ticker that advances while waiting
+            // for real SSE events (handles buffered/chunked delivery)
+            let simulatedProgress = 5
+            const ticker = setInterval(() => {
+              simulatedProgress = Math.min(simulatedProgress + 3, 90)
+              setProgress((prev) => {
+                if (!prev || prev.progress >= simulatedProgress) return prev
+                return { ...prev, progress: simulatedProgress }
+              })
+              // Dispatch outside updater to avoid cross-component setState during render
+              queueMicrotask(() => {
+                window.dispatchEvent(
+                  new CustomEvent("ai-analysis-progress", {
+                    detail: { step: "vlm", progress: simulatedProgress },
+                  })
+                )
+              })
+            }, 800)
+
+            try {
+              const decoder = new TextDecoder()
+              let buffer = ""
+
+              for (;;) {
+                const { done, value } = await reader.read()
+                if (done) break
+
+                buffer += decoder.decode(value, { stream: true })
+                const parts = buffer.split("\n\n")
+                buffer = parts.pop() ?? ""
+
+                for (const part of parts) {
+                  for (const line of part.split("\n")) {
+                    if (!line.startsWith("data: ")) continue
+                    try {
+                      const evt = JSON.parse(line.slice(6)) as {
+                        step: string
+                        progress?: number
+                        message?: string
+                        result?: AIResponse
+                      }
+
+                      if (evt.step === "error") {
+                        throw new Error(evt.message ?? t.ai.analysisError)
+                      }
+
+                      const realProgress = evt.progress ?? 0
+                      simulatedProgress = Math.max(simulatedProgress, realProgress)
+                      emitProgress({ step: evt.step, progress: realProgress })
+
+                      if (evt.step === "done" && evt.result) {
+                        finalResult = evt.result
+                      }
+                    } catch (parseErr) {
+                      if (parseErr instanceof SyntaxError) continue
+                      throw parseErr
+                    }
+                  }
                 }
               }
+            } finally {
+              clearInterval(ticker)
+            }
+          }
+
+          if (!finalResult) throw new Error(t.ai.analysisError)
+
+          // If AI detected objects, dispatch a single batch event for 3D tag creation
+          if (finalResult.taskType === "vision-detect" && finalResult.output.structuredData) {
+            emitProgress({ step: "placing", progress: 95 })
+            const detected = finalResult.output.structuredData
+            if (Array.isArray(detected.objects) && detected.objects.length > 0) {
+              const items = (detected.objects as Array<{
+                label?: string
+                description?: string
+                bbox?: [number, number, number, number] | null
+                color?: { r: number; g: number; b: number }
+                confidence?: number
+                category?: string
+              }>).filter((o) => o.label)
+
+              window.dispatchEvent(
+                new CustomEvent("annotations-from-ai", {
+                  detail: {
+                    items,
+                    screenshotPose: submitPose,
+                    spaceId: space.id,
+                    roomId: room?.id ?? "",
+                    roomName: room?.name ?? "",
+                  }
+                })
+              )
             }
           }
 
           startTransition(() => {
-            setResult(payload)
+            setResult(finalResult)
+            emitProgress(null)
           })
         } catch (caughtError) {
           const message =
@@ -253,13 +382,14 @@ export function CommandBar({ room, space }: CommandBarProps) {
           startTransition(() => {
             setError(message)
             setResult(null)
+            emitProgress(null)
           })
         } finally {
           setIsSubmitting(false)
         }
       })()
     },
-    [activeAttachment, command, room, space, taskType, t]
+    [activeAttachment, bridge, command, room, screenshotPose, space, taskType, t]
   )
 
   return (
@@ -415,9 +545,26 @@ export function CommandBar({ room, space }: CommandBarProps) {
         </div>
       </form>
 
-      <p className="command-bar__preview">
-        {deferredCommand}
-      </p>
+      {progress ? (
+        <div className="command-bar__progress" aria-live="polite">
+          <div className="command-bar__progress-bar">
+            <div
+              className="command-bar__progress-fill"
+              style={{ width: `${progress.progress}%` }}
+            />
+          </div>
+          <div className="command-bar__progress-info">
+            <span className="command-bar__progress-step">
+              {(STEP_LABELS[locale] ?? STEP_LABELS.en)[progress.step] ?? progress.step}
+            </span>
+            <span className="command-bar__progress-pct">{progress.progress}%</span>
+          </div>
+        </div>
+      ) : (
+        <p className="command-bar__preview">
+          {deferredCommand}
+        </p>
+      )}
 
       {result || error ? (
         <div className="command-brief" aria-live="polite">
@@ -428,7 +575,23 @@ export function CommandBar({ room, space }: CommandBarProps) {
           {error ? <p className="command-brief__error">{error}</p> : null}
           {result ? (
             <>
-              <p>{result.output.summary}</p>
+              {result.taskType === "vision-detect" && Array.isArray(result.output.structuredData?.objects) && result.output.structuredData.objects.length > 0 ? (
+                <div className="command-brief__objects">
+                  <strong>{result.output.structuredData.objects.length} objects detected</strong>
+                  <ul>
+                    {(result.output.structuredData.objects as Array<{label: string; category?: string; confidence?: number}>).map((obj, i) => (
+                      <li key={`${obj.label}-${i}`}>
+                        <span>{obj.label}</span>
+                        {obj.confidence != null ? (
+                          <span className="command-brief__confidence">{Math.round(obj.confidence * 100)}%</span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <p>{result.output.summary}</p>
+              )}
               <ul className="command-brief__facts">
                 <li>Provider: {result.provider.providerId}</li>
                 <li>{t.providers.connected}: {result.provider.configured ? t.common.success : t.common.error}</li>

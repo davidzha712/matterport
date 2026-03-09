@@ -16,6 +16,29 @@ export function useAutoTour(
   const [autoTourState, setAutoTourState] = useState<AutoTourState>("idle")
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const userInteractedRef = useRef(false)
+  const aiAnalyzingRef = useRef(false)
+
+  // Pause auto-tour idle timer while AI analysis is running
+  useEffect(() => {
+    function onAIProgress(event: Event) {
+      const detail = (event as CustomEvent<{ step: string; progress: number } | null>).detail
+      if (!detail) {
+        // Analysis ended — resume idle tracking
+        aiAnalyzingRef.current = false
+        return
+      }
+      // Analysis started or in progress — suppress auto-tour
+      if (!aiAnalyzingRef.current) {
+        aiAnalyzingRef.current = true
+        if (idleTimerRef.current) {
+          clearTimeout(idleTimerRef.current)
+          idleTimerRef.current = null
+        }
+      }
+    }
+    window.addEventListener("ai-analysis-progress", onAIProgress)
+    return () => window.removeEventListener("ai-analysis-progress", onAIProgress)
+  }, [])
 
   const resetIdleTimer = useCallback(() => {
     userInteractedRef.current = true
@@ -30,10 +53,13 @@ export function useAutoTour(
       setAutoTourState("idle")
     }
 
+    // Don't restart idle countdown while AI is analyzing
+    if (aiAnalyzingRef.current) return
+
     // Restart idle countdown
     setAutoTourState("waiting")
     idleTimerRef.current = setTimeout(() => {
-      if (status === "sdk-connected" && !isTourActive) {
+      if (status === "sdk-connected" && !isTourActive && !aiAnalyzingRef.current) {
         void bridge.startTour().then((started) => {
           if (started) {
             setAutoTourState("touring")
@@ -47,11 +73,11 @@ export function useAutoTour(
   useEffect(() => {
     if (status !== "sdk-connected") return
 
-    // Don't auto-start if user has already interacted
-    if (userInteractedRef.current) return
+    // Don't auto-start if user has already interacted or AI is analyzing
+    if (userInteractedRef.current || aiAnalyzingRef.current) return
 
     idleTimerRef.current = setTimeout(() => {
-      if (!isTourActive) {
+      if (!isTourActive && !aiAnalyzingRef.current) {
         void bridge.startTour().then((started) => {
           if (started) {
             setAutoTourState("touring")
@@ -69,9 +95,16 @@ export function useAutoTour(
 
   // Listen for user interaction events to reset idle timer
   useEffect(() => {
-    const events = ["keydown", "mousedown", "touchstart", "wheel"] as const
+    const events = ["keydown", "mousedown", "mousemove", "touchstart", "wheel"] as const
 
-    function onInteraction() {
+    let lastMove = 0
+    function onInteraction(e: Event) {
+      // Throttle mousemove to avoid excessive timer resets
+      if (e.type === "mousemove") {
+        const now = Date.now()
+        if (now - lastMove < 2000) return
+        lastMove = now
+      }
       resetIdleTimer()
     }
 
@@ -94,16 +127,18 @@ export function useAutoTour(
     if (!isTourActive && autoTourState === "touring") {
       // Tour ended naturally (finished all steps)
       setAutoTourState("idle")
-      // Restart idle timer to loop
-      idleTimerRef.current = setTimeout(() => {
-        if (status === "sdk-connected") {
-          void bridge.startTour().then((started) => {
-            if (started) {
-              setAutoTourState("touring")
-            }
-          })
-        }
-      }, IDLE_TIMEOUT_MS)
+      // Restart idle timer to loop (only if not analyzing)
+      if (!aiAnalyzingRef.current) {
+        idleTimerRef.current = setTimeout(() => {
+          if (status === "sdk-connected" && !aiAnalyzingRef.current) {
+            void bridge.startTour().then((started) => {
+              if (started) {
+                setAutoTourState("touring")
+              }
+            })
+          }
+        }, IDLE_TIMEOUT_MS)
+      }
     }
   }, [autoTourState, bridge, isTourActive, status])
 

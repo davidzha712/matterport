@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useState } from "react"
 import { motion, useReducedMotion, AnimatePresence } from "framer-motion"
+import { AIProgressOverlay } from "@/components/ai-progress-overlay"
 import { CommandBar } from "@/components/command-bar"
 import { ContextPanel } from "@/components/context-panel"
 import { InteractionDialog } from "@/components/interaction-dialog"
@@ -193,8 +194,9 @@ function ImmersiveShellInner({
           />
         </motion.aside>
 
-        <StageControls />
+        <StageControls spaceId={space.id} />
         <StageToolbar bridge={bridge} currentRoom={sdkRoom} />
+        <AIProgressOverlay />
 
         {/* Bottom chrome */}
         <motion.footer
