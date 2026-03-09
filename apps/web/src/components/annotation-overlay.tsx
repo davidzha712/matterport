@@ -18,6 +18,7 @@ type AnnotationOverlayProps = {
   onFocusTag?: (tagId: string) => void
   onRemove: (id: string) => Promise<void> | void
   onUpdate: (id: string, updates: Partial<Omit<SpatialAnnotation, "id">>) => void
+  readOnly?: boolean
 }
 
 type EditingState = {
@@ -78,6 +79,7 @@ export function AnnotationOverlay({
   onFocusTag,
   onRemove,
   onUpdate,
+  readOnly,
 }: AnnotationOverlayProps) {
   const [collapsed, setCollapsed] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -311,147 +313,211 @@ export function AnnotationOverlay({
                       ) : null}
                     </div>
                   </div>
-                  <div className="flex flex-col gap-3">
-                    <label className="flex flex-col gap-1">
-                      <span className="text-xs text-muted-foreground">Label</span>
-                      <Input
-                        onChange={(e) => updateField("label", e.target.value)}
-                        type="text"
-                        value={editState.label}
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1">
-                      <span className="text-xs text-muted-foreground">Description</span>
-                      <Textarea
-                        onChange={(e) => updateField("description", e.target.value)}
-                        rows={2}
-                        value={editState.description}
-                      />
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
+                  {readOnly ? (
+                    <div className="flex flex-col gap-3">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs text-muted-foreground">Label</span>
+                        <p className="text-sm">{editState.label || "—"}</p>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs text-muted-foreground">Description</span>
+                        <p className="text-sm whitespace-pre-wrap">{editState.description || "—"}</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs text-muted-foreground">Category</span>
+                          <p className="text-sm">{editState.category || "—"}</p>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs text-muted-foreground">Condition</span>
+                          <p className="text-sm">{editState.condition || "—"}</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs text-muted-foreground">Material</span>
+                        <p className="text-sm">{editState.material || "—"}</p>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs text-muted-foreground">Era / Period</span>
+                        <p className="text-sm">{editState.era || "—"}</p>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs text-muted-foreground">Value Min</span>
+                          <p className="text-sm">{editState.valueMin || "—"}</p>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs text-muted-foreground">Value Max</span>
+                          <p className="text-sm">{editState.valueMax || "—"}</p>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs text-muted-foreground">Currency</span>
+                          <p className="text-sm">{editState.valueCurrency || "—"}</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs text-muted-foreground">X</span>
+                          <p className="text-sm">{editState.posX}</p>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs text-muted-foreground">Y</span>
+                          <p className="text-sm">{editState.posY}</p>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs text-muted-foreground">Z</span>
+                          <p className="text-sm">{editState.posZ}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 pt-2 border-t border-border/30 sticky bottom-0 bg-card/95 backdrop-blur-sm py-2">
+                        <Button className="flex-1" onClick={cancelEditing} size="sm" variant="ghost">
+                          ← Back
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3">
                       <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">Category</span>
-                        <select
-                          className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none focus-visible:border-ring"
-                          onChange={(e) => updateField("category", e.target.value)}
-                          value={editState.category}
+                        <span className="text-xs text-muted-foreground">Label</span>
+                        <Input
+                          onChange={(e) => updateField("label", e.target.value)}
+                          type="text"
+                          value={editState.label}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="text-xs text-muted-foreground">Description</span>
+                        <Textarea
+                          onChange={(e) => updateField("description", e.target.value)}
+                          rows={2}
+                          value={editState.description}
+                        />
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="flex flex-col gap-1">
+                          <span className="text-xs text-muted-foreground">Category</span>
+                          <select
+                            className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none focus-visible:border-ring"
+                            onChange={(e) => updateField("category", e.target.value)}
+                            value={editState.category}
+                          >
+                            <option value="">--</option>
+                            {CATEGORIES.map((c) => (
+                              <option key={c} value={c}>{c}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-xs text-muted-foreground">Condition</span>
+                          <select
+                            className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none focus-visible:border-ring"
+                            onChange={(e) => updateField("condition", e.target.value)}
+                            value={editState.condition}
+                          >
+                            {CONDITIONS.map((c) => (
+                              <option key={c} value={c}>{c}</option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                      <label className="flex flex-col gap-1">
+                        <span className="text-xs text-muted-foreground">Material</span>
+                        <Input
+                          onChange={(e) => updateField("material", e.target.value)}
+                          type="text"
+                          placeholder="e.g. Oak wood, Bronze, Silk"
+                          value={editState.material}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="text-xs text-muted-foreground">Era / Period</span>
+                        <Input
+                          onChange={(e) => updateField("era", e.target.value)}
+                          type="text"
+                          placeholder="e.g. 18th Century, Art Deco"
+                          value={editState.era}
+                        />
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
+                        <label className="flex flex-col gap-1">
+                          <span className="text-xs text-muted-foreground">Value Min</span>
+                          <Input
+                            inputMode="decimal"
+                            onChange={(e) => updateField("valueMin", e.target.value)}
+                            type="text"
+                            value={editState.valueMin}
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-xs text-muted-foreground">Value Max</span>
+                          <Input
+                            inputMode="decimal"
+                            onChange={(e) => updateField("valueMax", e.target.value)}
+                            type="text"
+                            value={editState.valueMax}
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-xs text-muted-foreground">Currency</span>
+                          <select
+                            className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none focus-visible:border-ring"
+                            onChange={(e) => updateField("valueCurrency", e.target.value)}
+                            value={editState.valueCurrency}
+                          >
+                            <option value="EUR">EUR</option>
+                            <option value="USD">USD</option>
+                            <option value="GBP">GBP</option>
+                            <option value="CNY">CNY</option>
+                          </select>
+                        </label>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <label className="flex flex-col gap-1">
+                          <span className="text-xs text-muted-foreground">X</span>
+                          <Input
+                            inputMode="decimal"
+                            onChange={(e) => updateField("posX", e.target.value)}
+                            type="text"
+                            value={editState.posX}
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-xs text-muted-foreground">Y</span>
+                          <Input
+                            inputMode="decimal"
+                            onChange={(e) => updateField("posY", e.target.value)}
+                            type="text"
+                            value={editState.posY}
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-xs text-muted-foreground">Z</span>
+                          <Input
+                            inputMode="decimal"
+                            onChange={(e) => updateField("posZ", e.target.value)}
+                            type="text"
+                            value={editState.posZ}
+                          />
+                        </label>
+                      </div>
+                      <div className="flex gap-2 pt-2 border-t border-border/30 sticky bottom-0 bg-card/95 backdrop-blur-sm py-2">
+                        <Button className="flex-1" onClick={() => commitEdit(editingId)} size="sm" variant="secondary">
+                          Save
+                        </Button>
+                        <Button
+                          className="text-destructive"
+                          onClick={() => { cancelEditing(); void onRemove(annotation.id) }}
+                          size="sm"
+                          variant="ghost"
                         >
-                          <option value="">--</option>
-                          {CATEGORIES.map((c) => (
-                            <option key={c} value={c}>{c}</option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">Condition</span>
-                        <select
-                          className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none focus-visible:border-ring"
-                          onChange={(e) => updateField("condition", e.target.value)}
-                          value={editState.condition}
-                        >
-                          {CONDITIONS.map((c) => (
-                            <option key={c} value={c}>{c}</option>
-                          ))}
-                        </select>
-                      </label>
+                          Remove
+                        </Button>
+                        <Button className="flex-1" onClick={cancelEditing} size="sm" variant="ghost">
+                          Cancel
+                        </Button>
+                      </div>
                     </div>
-                    <label className="flex flex-col gap-1">
-                      <span className="text-xs text-muted-foreground">Material</span>
-                      <Input
-                        onChange={(e) => updateField("material", e.target.value)}
-                        type="text"
-                        placeholder="e.g. Oak wood, Bronze, Silk"
-                        value={editState.material}
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1">
-                      <span className="text-xs text-muted-foreground">Era / Period</span>
-                      <Input
-                        onChange={(e) => updateField("era", e.target.value)}
-                        type="text"
-                        placeholder="e.g. 18th Century, Art Deco"
-                        value={editState.era}
-                      />
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">Value Min</span>
-                        <Input
-                          inputMode="decimal"
-                          onChange={(e) => updateField("valueMin", e.target.value)}
-                          type="text"
-                          value={editState.valueMin}
-                        />
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">Value Max</span>
-                        <Input
-                          inputMode="decimal"
-                          onChange={(e) => updateField("valueMax", e.target.value)}
-                          type="text"
-                          value={editState.valueMax}
-                        />
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">Currency</span>
-                        <select
-                          className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none focus-visible:border-ring"
-                          onChange={(e) => updateField("valueCurrency", e.target.value)}
-                          value={editState.valueCurrency}
-                        >
-                          <option value="EUR">EUR</option>
-                          <option value="USD">USD</option>
-                          <option value="GBP">GBP</option>
-                          <option value="CNY">CNY</option>
-                        </select>
-                      </label>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">X</span>
-                        <Input
-                          inputMode="decimal"
-                          onChange={(e) => updateField("posX", e.target.value)}
-                          type="text"
-                          value={editState.posX}
-                        />
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">Y</span>
-                        <Input
-                          inputMode="decimal"
-                          onChange={(e) => updateField("posY", e.target.value)}
-                          type="text"
-                          value={editState.posY}
-                        />
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">Z</span>
-                        <Input
-                          inputMode="decimal"
-                          onChange={(e) => updateField("posZ", e.target.value)}
-                          type="text"
-                          value={editState.posZ}
-                        />
-                      </label>
-                    </div>
-                    <div className="flex gap-2 pt-2 border-t border-border/30 sticky bottom-0 bg-card/95 backdrop-blur-sm py-2">
-                      <Button className="flex-1" onClick={() => commitEdit(editingId)} size="sm" variant="secondary">
-                        Save
-                      </Button>
-                      <Button
-                        className="text-destructive"
-                        onClick={() => { cancelEditing(); void onRemove(annotation.id) }}
-                        size="sm"
-                        variant="ghost"
-                      >
-                        Remove
-                      </Button>
-                      <Button className="flex-1" onClick={cancelEditing} size="sm" variant="ghost">
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
+                  )}
                 </div>
               )
             })()
@@ -460,9 +526,11 @@ export function AnnotationOverlay({
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <Badge variant="outline">{statusLabel}</Badge>
-                <Button onClick={handleAdd} size="sm" variant="secondary">
-                  Add Annotation
-                </Button>
+                {readOnly ? null : (
+                  <Button onClick={handleAdd} size="sm" variant="secondary">
+                    Add Annotation
+                  </Button>
+                )}
               </div>
 
               {annotations.length === 0 ? (
@@ -500,22 +568,24 @@ export function AnnotationOverlay({
                                 ) : null}
                               </div>
                             </div>
-                            <div className="flex items-center gap-1 shrink-0">
-                              {isSaved ? (
-                                <Badge variant="outline" className="text-green-400 border-green-400/30 text-[10px]">Saved</Badge>
-                              ) : isSaving ? (
-                                <Badge variant="outline" className="text-[10px]">...</Badge>
-                              ) : (
-                                <Button
-                                  onClick={(e) => { e.stopPropagation(); void handleSaveToApi(annotation) }}
-                                  size="sm"
-                                  variant="ghost"
-                                  className="text-xs h-6 px-2"
-                                >
-                                  Save
-                                </Button>
-                              )}
-                            </div>
+                            {readOnly ? null : (
+                              <div className="flex items-center gap-1 shrink-0">
+                                {isSaved ? (
+                                  <Badge variant="outline" className="text-green-400 border-green-400/30 text-[10px]">Saved</Badge>
+                                ) : isSaving ? (
+                                  <Badge variant="outline" className="text-[10px]">...</Badge>
+                                ) : (
+                                  <Button
+                                    onClick={(e) => { e.stopPropagation(); void handleSaveToApi(annotation) }}
+                                    size="sm"
+                                    variant="ghost"
+                                    className="text-xs h-6 px-2"
+                                  >
+                                    Save
+                                  </Button>
+                                )}
+                              </div>
+                            )}
                           </CardContent>
                         </Card>
                       </li>

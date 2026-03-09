@@ -10,13 +10,22 @@ import { useT } from "@/lib/i18n"
 import { buildObjectRoute, buildRoomRoute } from "@/lib/routes"
 
 type ContextPanelProps = {
+  panelConfig?: {
+    leftPanel: boolean
+    commandBar: boolean
+    rightPanel: boolean
+    objectWorkflowCard: boolean
+    aiDetections: boolean
+    workflowSidebar: boolean
+  }
   providers: ProviderProfile[]
   selectedObject?: ObjectRecord
   selectedRoom?: RoomRecord
+  showReviewCounts?: boolean
   space: SpaceRecord
 }
 
-export function ContextPanel({ providers, selectedObject, selectedRoom, space }: ContextPanelProps) {
+export function ContextPanel({ panelConfig, providers, selectedObject, selectedRoom, showReviewCounts, space }: ContextPanelProps) {
   const { bridge, status, currentRoom: sdkRoom, sdkRooms } = useBridge()
   const t = useT()
   const [detectedObjects, setDetectedObjects] = useState<ObjectRecord[]>([])
@@ -28,7 +37,23 @@ export function ContextPanel({ providers, selectedObject, selectedRoom, space }:
         r.id === sdkRoom.id
       )
     : undefined
-  const focalRoom = selectedRoom ?? matchedRoom ?? space.rooms[0]
+
+  // When SDK reports a room that doesn't exist in the data model, create a
+  // lightweight RoomRecord from the SDK data so the UI reflects the real room.
+  const sdkFallbackRoom: RoomRecord | undefined =
+    !matchedRoom && sdkRoom?.name
+      ? {
+          id: sdkRoom.id,
+          name: sdkRoom.name,
+          objectIds: [],
+          pendingReviewCount: 0,
+          priorityBand: "Medium",
+          recommendation: "",
+          summary: "",
+        }
+      : undefined
+
+  const focalRoom = selectedRoom ?? matchedRoom ?? sdkFallbackRoom ?? space.rooms[0]
   const focalObject = selectedObject ?? space.objects.find((o) => o.roomId === focalRoom.id) ?? space.objects[0]
   const objectRoute = buildObjectRoute(space.id, focalObject.id)
 
@@ -73,7 +98,9 @@ export function ContextPanel({ providers, selectedObject, selectedRoom, space }:
   return (
     <aside className="context-panel" aria-label={t.stage.roomContext}>
       <div className="context-panel__handle" aria-hidden="true" />
-      <ObjectWorkflowCard objectRecord={focalObject} objectRoute={objectRoute} spaceId={space.id} />
+      {panelConfig?.objectWorkflowCard !== false ? (
+        <ObjectWorkflowCard objectRecord={focalObject} objectRoute={objectRoute} spaceId={space.id} />
+      ) : null}
 
       <section className="context-card">
         <div className="section-heading">
@@ -81,7 +108,9 @@ export function ContextPanel({ providers, selectedObject, selectedRoom, space }:
             <p className="eyebrow">{t.objects.room}</p>
             <h2>{focalRoom.name}</h2>
           </div>
-          <span className="pill pill--active">{focalRoom.pendingReviewCount} {t.workflow.needsReview.toLowerCase()}</span>
+          {showReviewCounts !== false ? (
+            <span className="pill pill--active">{focalRoom.pendingReviewCount} {t.workflow.needsReview.toLowerCase()}</span>
+          ) : null}
         </div>
         <p>{focalRoom.summary}</p>
         <ul className="context-list">
@@ -99,7 +128,7 @@ export function ContextPanel({ providers, selectedObject, selectedRoom, space }:
             </p>
             <ul className="context-room-list">
               {sdkRooms.length > 0
-                ? sdkRooms.map((room) => {
+                ? sdkRooms.filter((room) => room.name).map((room) => {
                     const dataRoom = space.rooms.find(
                       (r) => r.name.toLowerCase() === room.name.toLowerCase() || r.id === room.id
                     )
@@ -139,7 +168,7 @@ export function ContextPanel({ providers, selectedObject, selectedRoom, space }:
       </section>
 
       {/* AI-detected objects for current room */}
-      {detectedObjects.length > 0 ? (
+      {panelConfig?.aiDetections !== false && detectedObjects.length > 0 ? (
         <section className="context-card">
           <div className="section-heading">
             <div>
@@ -191,7 +220,9 @@ export function ContextPanel({ providers, selectedObject, selectedRoom, space }:
           <li>Jede KI-Ausgabe bleibt pruefbar und nachvollziehbar.</li>
         </ul>
       </section>
-      <WorkflowSidebar providers={providers} spaceId={space.id} />
+      {panelConfig?.workflowSidebar !== false ? (
+        <WorkflowSidebar providers={providers} spaceId={space.id} />
+      ) : null}
       <Link className="primary-link" href="/settings/providers">
         {t.providers.headline}
       </Link>

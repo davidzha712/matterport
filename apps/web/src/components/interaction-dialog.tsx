@@ -27,12 +27,33 @@ export function InteractionDialog({
   space,
 }: InteractionDialogProps) {
   const t = useT()
-  const { bridge, status } = useBridge()
+  const { bridge, status, currentRoom: sdkRoom } = useBridge()
   const [editingField, setEditingField] = useState<string | null>(null)
   const [editValue, setEditValue] = useState("")
   const [message, setMessage] = useState("")
 
-  const currentRoom = room ?? space.rooms[0]
+  // Match SDK room to data model for accurate room context
+  const matchedRoom = sdkRoom
+    ? space.rooms.find((r) =>
+        (sdkRoom.name && r.name.toLowerCase() === sdkRoom.name.toLowerCase()) ||
+        r.id === sdkRoom.id
+      )
+    : undefined
+
+  const sdkFallbackRoom: RoomRecord | undefined =
+    !matchedRoom && sdkRoom?.name
+      ? {
+          id: sdkRoom.id,
+          name: sdkRoom.name,
+          objectIds: [],
+          pendingReviewCount: 0,
+          priorityBand: "Medium",
+          recommendation: "",
+          summary: "",
+        }
+      : undefined
+
+  const currentRoom = room ?? matchedRoom ?? sdkFallbackRoom ?? space.rooms[0]
   const roomObjects = objects.filter((o) => o.roomId === currentRoom?.id)
   const sdkConnected = status === "sdk-connected"
 

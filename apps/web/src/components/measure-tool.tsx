@@ -2,14 +2,19 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useBridge } from "@/lib/bridge-context"
-import type { PointerIntersection } from "@/lib/matterport-bridge"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 
 type MeasurePoint = {
-  position: { x: number; y: number; z: number }
+  world: { x: number; y: number; z: number }
   screenX: number
   screenY: number
+}
+
+type Measurement = {
+  a: MeasurePoint
+  b: MeasurePoint
+  distance: number
 }
 
 function distance3d(
@@ -36,33 +41,34 @@ type MeasureToolProps = {
 export function MeasureTool({ active, onClose }: MeasureToolProps) {
   const { bridge, status } = useBridge()
   const [pointA, setPointA] = useState<MeasurePoint | null>(null)
-  const [pointB, setPointB] = useState<MeasurePoint | null>(null)
-  const [cursorPos, setCursorPos] = useState<PointerIntersection | null>(null)
-  const [measurements, setMeasurements] = useState<
-    Array<{ a: MeasurePoint; b: MeasurePoint; distance: number }>
-  >([])
-  const overlayRef = useRef<HTMLDivElement>(null)
+  const [cursorScreen, setCursorScreen] = useState<{ x: number; y: number } | null>(null)
+  const [measurements, setMeasurements] = useState<Measurement[]>([])
+  const iframeRectRef = useRef<DOMRect | null>(null)
 
-  // Subscribe to pointer intersection for real-time cursor feedback
+  // Update iframe rect on resize
   useEffect(() => {
-    if (!active || status !== "sdk-connected") return
-    const unsub = bridge.onPointerMove((intersection) => {
-      if (intersection.position) {
-        setCursorPos(intersection)
-      }
-    })
-    return unsub
-  }, [active, bridge, status])
+    if (!active) return
+    function updateRect() {
+      const iframe = document.querySelector("iframe")
+      if (iframe) iframeRectRef.current = iframe.getBoundingClientRect()
+    }
+    updateRect()
+    window.addEventListener("resize", updateRect)
+    return () => window.removeEventListener("resize", updateRect)
+  }, [active])
 
-  // Handle click on the overlay to place measurement points
+  // Track mouse position for live line
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    setCursorScreen({ x: e.clientX, y: e.clientY })
+  }, [])
+
+  // Place measurement point
   const handleClick = useCallback(
     async (e: React.MouseEvent) => {
       if (!active || status !== "sdk-connected") return
+      const rect = iframeRectRef.current
+      if (!rect) return
 
-      const iframe = document.querySelector("iframe")
-      if (!iframe) return
-
-      const rect = iframe.getBoundingClientRect()
       const screenX = e.clientX - rect.left
       const screenY = e.clientY - rect.top
 
@@ -70,29 +76,24 @@ export function MeasureTool({ active, onClose }: MeasureToolProps) {
       if (!result?.position) return
 
       const point: MeasurePoint = {
-        position: result.position,
+        world: result.position,
         screenX: e.clientX,
         screenY: e.clientY,
       }
 
       if (!pointA) {
         setPointA(point)
-        setPointB(null)
-      } else if (!pointB) {
-        setPointB(point)
-        const dist = distance3d(pointA.position, point.position)
+      } else {
+        const dist = distance3d(pointA.world, point.world)
         setMeasurements((prev) => [...prev, { a: pointA, b: point, distance: dist }])
-        // Reset for next measurement
         setPointA(null)
-        setPointB(null)
       }
     },
-    [active, bridge, pointA, pointB, status]
+    [active, bridge, pointA, status]
   )
 
   const clearAll = useCallback(() => {
     setPointA(null)
-    setPointB(null)
     setMeasurements([])
   }, [])
 
@@ -100,47 +101,97 @@ export function MeasureTool({ active, onClose }: MeasureToolProps) {
     setMeasurements((prev) => prev.slice(0, -1))
   }, [])
 
+  const handleClose = useCallback(() => {
+    setPointA(null)
+    setMeasurements([])
+    onClose()
+  }, [onClose])
+
   if (!active) return null
 
   const liveDistance =
-    pointA && cursorPos?.position
-      ? distance3d(pointA.position, cursorPos.position)
+    pointA && cursorScreen
+      ? null // We can't compute live distance without a world position for cursor
       : null
 
   return (
     <>
-      {/* Click capture overlay — transparent, above iframe but below our UI */}
+      {/* Click + mouse capture overlay */}
       <div
-        ref={overlayRef}
         className="measure-tool__capture"
         onClick={handleClick}
+        onMouseMove={handleMouseMove}
       />
 
-      {/* Measurement HUD */}
+      {/* SVG overlay for lines and markers */}
+      <svg className="measure-tool__svg" aria-hidden="true">
+        {/* Completed measurement lines */}
+        {measurements.map((m, i) => {
+          const midX = (m.a.screenX + m.b.screenX) / 2
+          const midY = (m.a.screenY + m.b.screenY) / 2
+          return (
+            <g key={i}>
+              <line
+                x1={m.a.screenX} y1={m.a.screenY}
+                x2={m.b.screenX} y2={m.b.screenY}
+                className="measure-tool__line"
+              />
+              <circle cx={m.a.screenX} cy={m.a.screenY} r="5" className="measure-tool__dot" />
+              <circle cx={m.b.screenX} cy={m.b.screenY} r="5" className="measure-tool__dot" />
+              <rect
+                x={midX - 36} y={midY - 12}
+                width="72" height="24"
+                rx="6"
+                className="measure-tool__label-bg"
+              />
+              <text
+                x={midX} y={midY + 4}
+                className="measure-tool__label-text"
+                textAnchor="middle"
+              >
+                {formatDistance(m.distance)}
+              </text>
+            </g>
+          )
+        })}
+
+        {/* Active point A + live line to cursor */}
+        {pointA ? (
+          <g>
+            <circle cx={pointA.screenX} cy={pointA.screenY} r="7" className="measure-tool__dot measure-tool__dot--active" />
+            <text
+              x={pointA.screenX + 12} y={pointA.screenY + 4}
+              className="measure-tool__point-label"
+            >
+              A
+            </text>
+            {cursorScreen ? (
+              <line
+                x1={pointA.screenX} y1={pointA.screenY}
+                x2={cursorScreen.x} y2={cursorScreen.y}
+                className="measure-tool__line measure-tool__line--live"
+              />
+            ) : null}
+          </g>
+        ) : null}
+      </svg>
+
+      {/* HUD panel */}
       <div className="measure-tool">
         <div className="measure-tool__header">
-          <span className="measure-tool__title">Measurement</span>
-          <Button onClick={onClose} size="sm" variant="ghost" className="h-6 px-2 text-xs">
+          <span className="measure-tool__title">Measure</span>
+          <Button onClick={handleClose} size="sm" variant="ghost" className="h-6 px-2 text-xs">
             Close
           </Button>
         </div>
 
         <div className="measure-tool__instructions">
           {!pointA ? (
-            <p>Click a point to start measuring</p>
+            <p>Click a surface to set point A</p>
           ) : (
-            <p>Click another point to complete</p>
+            <p>Click another surface to measure distance</p>
           )}
         </div>
-
-        {/* Live distance while measuring */}
-        {liveDistance !== null ? (
-          <div className="measure-tool__live">
-            <Badge variant="secondary" className="text-base font-mono tabular-nums">
-              {formatDistance(liveDistance)}
-            </Badge>
-          </div>
-        ) : null}
 
         {/* Saved measurements */}
         {measurements.length > 0 ? (
@@ -155,34 +206,15 @@ export function MeasureTool({ active, onClose }: MeasureToolProps) {
             </ul>
             <div className="measure-tool__actions">
               <Button onClick={removeLast} size="sm" variant="ghost" className="h-6 px-2 text-xs">
-                Undo Last
+                Undo
               </Button>
               <Button onClick={clearAll} size="sm" variant="ghost" className="h-6 px-2 text-xs text-destructive">
-                Clear All
+                Clear
               </Button>
             </div>
           </div>
         ) : null}
-
-        {/* Point A indicator */}
-        {pointA ? (
-          <div className="measure-tool__point-info">
-            <span className="text-xs text-muted-foreground">
-              A: ({pointA.position.x.toFixed(2)}, {pointA.position.y.toFixed(2)}, {pointA.position.z.toFixed(2)})
-            </span>
-          </div>
-        ) : null}
       </div>
-
-      {/* Point A marker on screen */}
-      {pointA ? (
-        <div
-          className="measure-tool__marker"
-          style={{ left: pointA.screenX, top: pointA.screenY }}
-        >
-          A
-        </div>
-      ) : null}
     </>
   )
 }

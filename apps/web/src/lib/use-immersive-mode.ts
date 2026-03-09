@@ -91,8 +91,9 @@ export function useImmersiveMode(bridge: MatterportBridge) {
           // One-key vision analysis: screenshot → auto-submit to AI
           void bridge.captureScreenshot().then((dataUrl) => {
             if (dataUrl) {
+              const pose = bridge.screenshotPose
               window.dispatchEvent(
-                new CustomEvent("matterport-screenshot", { detail: { dataUrl } })
+                new CustomEvent("matterport-screenshot", { detail: { dataUrl, pose } })
               )
               // Auto-submit after a short delay to let command-bar pick up the screenshot
               setTimeout(() => {
@@ -108,6 +109,33 @@ export function useImmersiveMode(bridge: MatterportBridge) {
     return () => {
       window.removeEventListener("keydown", handleKeyDown)
     }
+  }, [bridge, isImmersive])
+
+  // Global V key handler — works outside immersive mode too
+  useEffect(() => {
+    function handleGlobalKeyDown(e: KeyboardEvent) {
+      if (isImmersive) return // handled by immersive keydown above
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return
+
+      if (e.key === "v" || e.key === "V") {
+        e.preventDefault()
+        void bridge.captureScreenshot().then((dataUrl) => {
+          if (dataUrl) {
+            const pose = bridge.screenshotPose
+            window.dispatchEvent(
+              new CustomEvent("matterport-screenshot", { detail: { dataUrl, pose } })
+            )
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent("auto-vision-analyze"))
+            }, 300)
+          }
+        })
+      }
+    }
+
+    window.addEventListener("keydown", handleGlobalKeyDown)
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown)
   }, [bridge, isImmersive])
 
   return {

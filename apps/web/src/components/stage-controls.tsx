@@ -48,9 +48,10 @@ function distance3d(
 
 type StageControlsProps = {
   spaceId: string
+  annotationMode?: "hidden" | "read-only" | "read-write"
 }
 
-export function StageControls({ spaceId }: StageControlsProps) {
+export function StageControls({ spaceId, annotationMode }: StageControlsProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [annotations, setAnnotations] = useState<SpatialAnnotation[]>([])
   const [captureHint, setCaptureHint] = useState<string | null>(null)
@@ -361,15 +362,18 @@ export function StageControls({ spaceId }: StageControlsProps) {
         </div>
       ) : null}
 
-      <AnnotationOverlay
-        annotations={annotations}
-        bridge={bridge}
-        bridgeStatus={status}
-        onAdd={handleAddAnnotation}
-        onFocusTag={handleFocusTag}
-        onRemove={handleRemoveAnnotation}
-        onUpdate={handleUpdateAnnotation}
-      />
+      {annotationMode !== "hidden" ? (
+        <AnnotationOverlay
+          annotations={annotations}
+          bridge={bridge}
+          bridgeStatus={status}
+          onAdd={handleAddAnnotation}
+          onFocusTag={handleFocusTag}
+          onRemove={handleRemoveAnnotation}
+          onUpdate={handleUpdateAnnotation}
+          readOnly={annotationMode === "read-only"}
+        />
+      ) : null}
     </>
   )
 }

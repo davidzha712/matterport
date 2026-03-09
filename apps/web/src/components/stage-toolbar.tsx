@@ -9,11 +9,18 @@ type StageToolbarProps = {
   currentRoom?: RoomData
   measureActive?: boolean
   onMeasureToggle?: () => void
+  toolbarConfig?: {
+    viewModes: boolean
+    tour: boolean
+    screenshot: boolean
+    measure: boolean
+    aiDetect: boolean
+  }
 }
 
 type TourState = "idle" | "playing" | "paused"
 
-export function StageToolbar({ bridge, currentRoom, measureActive, onMeasureToggle }: StageToolbarProps) {
+export function StageToolbar({ bridge, currentRoom, measureActive, onMeasureToggle, toolbarConfig }: StageToolbarProps) {
   const t = useT()
   const [currentMode, setCurrentMode] = useState<ViewMode>("inside")
   const [tourState, setTourState] = useState<TourState>("idle")
@@ -112,22 +119,27 @@ export function StageToolbar({ bridge, currentRoom, measureActive, onMeasureTogg
 
   return (
     <div className="stage-toolbar">
-      <div className="stage-toolbar__group" role="group" aria-label={t.stage.mode}>
-        {(Object.keys(viewModeLabels) as ViewMode[]).map((mode) => (
-          <button
-            key={mode}
-            className={`stage-toolbar__btn${currentMode === mode ? " stage-toolbar__btn--active" : ""}`}
-            disabled={!sdkReady}
-            onClick={() => handleModeSwitch(mode)}
-            type="button"
-          >
-            {viewModeLabels[mode]}
-          </button>
-        ))}
-      </div>
+      {toolbarConfig?.viewModes !== false && (
+        <>
+          <div className="stage-toolbar__group" role="group" aria-label={t.stage.mode}>
+            {(Object.keys(viewModeLabels) as ViewMode[]).map((mode) => (
+              <button
+                key={mode}
+                className={`stage-toolbar__btn${currentMode === mode ? " stage-toolbar__btn--active" : ""}`}
+                disabled={!sdkReady}
+                onClick={() => handleModeSwitch(mode)}
+                type="button"
+              >
+                {viewModeLabels[mode]}
+              </button>
+            ))}
+          </div>
 
-      <div className="stage-toolbar__divider" aria-hidden="true" />
+          <div className="stage-toolbar__divider" aria-hidden="true" />
+        </>
+      )}
 
+      {toolbarConfig?.tour !== false && (
       <div className="stage-toolbar__group" role="group" aria-label={t.tour.autoTour}>
         {tourState === "playing" ? (
           <>
@@ -168,20 +180,25 @@ export function StageToolbar({ bridge, currentRoom, measureActive, onMeasureTogg
           </button>
         )}
       </div>
+      )}
 
-      <div className="stage-toolbar__divider" aria-hidden="true" />
+      {toolbarConfig?.screenshot !== false && (
+        <>
+          <div className="stage-toolbar__divider" aria-hidden="true" />
 
-      <button
-        className="stage-toolbar__btn"
-        disabled={!sdkReady}
-        onClick={() => void handleScreenshot()}
-        title={t.stage.captureView}
-        type="button"
-      >
-        {t.stage.captureView}
-      </button>
+          <button
+            className="stage-toolbar__btn"
+            disabled={!sdkReady}
+            onClick={() => void handleScreenshot()}
+            title={t.stage.captureView}
+            type="button"
+          >
+            {t.stage.captureView}
+          </button>
+        </>
+      )}
 
-      {onMeasureToggle ? (
+      {toolbarConfig?.measure !== false && onMeasureToggle ? (
         <button
           className={`stage-toolbar__btn${measureActive ? " stage-toolbar__btn--active" : ""}`}
           disabled={!sdkReady}
@@ -193,15 +210,17 @@ export function StageToolbar({ bridge, currentRoom, measureActive, onMeasureTogg
         </button>
       ) : null}
 
-      <button
-        className="stage-toolbar__btn stage-toolbar__btn--accent"
-        disabled={!sdkReady || analysisStatus !== null}
-        onClick={() => void handleVisionAnalysis()}
-        title={t.ai.detectObjects}
-        type="button"
-      >
-        {analysisStatus ?? t.ai.detectObjects}
-      </button>
+      {toolbarConfig?.aiDetect !== false && (
+        <button
+          className="stage-toolbar__btn stage-toolbar__btn--accent"
+          disabled={!sdkReady || analysisStatus !== null}
+          onClick={() => void handleVisionAnalysis()}
+          title={t.ai.detectObjects}
+          type="button"
+        >
+          {analysisStatus ?? t.ai.detectObjects}
+        </button>
+      )}
 
       {!sdkReady ? (
         <>
