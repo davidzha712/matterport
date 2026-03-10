@@ -6,7 +6,15 @@ import type { BridgeStatus } from "./matterport-bridge"
 
 type AutoTourState = "idle" | "waiting" | "touring"
 
-const IDLE_TIMEOUT_MS = 15_000 // 15s of no interaction → start auto tour
+export type TourSpeed = "slow" | "normal" | "fast"
+
+const SPEED_PAUSE_MS: Record<TourSpeed, number> = {
+  slow: 8000,
+  normal: 4000,
+  fast: 2000,
+}
+
+const IDLE_TIMEOUT_MS = 45_000 // 45s of no interaction → start auto tour
 
 export function useAutoTour(
   bridge: MatterportBridge,
@@ -14,75 +22,141 @@ export function useAutoTour(
   isTourActive: boolean
 ) {
   const [autoTourState, setAutoTourState] = useState<AutoTourState>("idle")
+  const [tourSpeed, setTourSpeed] = useState<TourSpeed>("normal")
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const stepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const userInteractedRef = useRef(false)
+  const userStoppedTourRef = useRef(false)
   const aiAnalyzingRef = useRef(false)
+  const customTourIndexRef = useRef(-1)
+  const customTourActiveRef = useRef(false)
+  const snapshotCountRef = useRef(0)
+
+  const clearTimers = useCallback(() => {
+    if (idleTimerRef.current) {
+      clearTimeout(idleTimerRef.current)
+      idleTimerRef.current = null
+    }
+    if (stepTimerRef.current) {
+      clearTimeout(stepTimerRef.current)
+      stepTimerRef.current = null
+    }
+  }, [])
 
   // Pause auto-tour idle timer while AI analysis is running
   useEffect(() => {
     function onAIProgress(event: Event) {
       const detail = (event as CustomEvent<{ step: string; progress: number } | null>).detail
       if (!detail) {
-        // Analysis ended — resume idle tracking
         aiAnalyzingRef.current = false
         return
       }
-      // Analysis started or in progress — suppress auto-tour
       if (!aiAnalyzingRef.current) {
         aiAnalyzingRef.current = true
-        if (idleTimerRef.current) {
-          clearTimeout(idleTimerRef.current)
-          idleTimerRef.current = null
-        }
+        clearTimers()
       }
     }
     window.addEventListener("ai-analysis-progress", onAIProgress)
     return () => window.removeEventListener("ai-analysis-progress", onAIProgress)
-  }, [])
+  }, [clearTimers])
+
+  // Custom stepped tour: advance to next snapshot with speed-controlled pause
+  const advanceCustomTour = useCallback(async () => {
+    if (!customTourActiveRef.current) return
+
+    const nextIndex = customTourIndexRef.current + 1
+    if (nextIndex >= snapshotCountRef.current) {
+      // Tour finished all stops — stop cleanly, do NOT loop
+      customTourActiveRef.current = false
+      customTourIndexRef.current = -1
+      setAutoTourState("idle")
+      void bridge.stopTour()
+      return
+    }
+
+    customTourIndexRef.current = nextIndex
+    const stepped = await bridge.stepTour(nextIndex)
+    if (!stepped || !customTourActiveRef.current) return
+
+    // Schedule next step after speed-controlled pause
+    stepTimerRef.current = setTimeout(() => {
+      void advanceCustomTour()
+    }, SPEED_PAUSE_MS[tourSpeed])
+  }, [bridge, tourSpeed])
+
+  // Start a custom stepped tour (speed-controllable)
+  const startCustomTour = useCallback(async () => {
+    const snapshots = await bridge.getTourSnapshots()
+    if (snapshots.length === 0) return
+
+    snapshotCountRef.current = snapshots.length
+    customTourIndexRef.current = -1
+    customTourActiveRef.current = true
+    setAutoTourState("touring")
+
+    void advanceCustomTour()
+  }, [bridge, advanceCustomTour])
+
+  // Stop custom tour
+  const stopCustomTour = useCallback(() => {
+    customTourActiveRef.current = false
+    customTourIndexRef.current = -1
+    clearTimers()
+    void bridge.stopTour()
+    setAutoTourState("idle")
+  }, [bridge, clearTimers])
+
+  // When speed changes mid-tour, restart the step timer with new delay
+  useEffect(() => {
+    if (!customTourActiveRef.current) return
+    if (stepTimerRef.current) {
+      clearTimeout(stepTimerRef.current)
+      stepTimerRef.current = setTimeout(() => {
+        void advanceCustomTour()
+      }, SPEED_PAUSE_MS[tourSpeed])
+    }
+  }, [tourSpeed, advanceCustomTour])
 
   const resetIdleTimer = useCallback(() => {
     userInteractedRef.current = true
 
-    if (idleTimerRef.current) {
-      clearTimeout(idleTimerRef.current)
+    clearTimers()
+
+    // If custom tour is running, stop it on user interaction
+    if (customTourActiveRef.current) {
+      stopCustomTour()
+      userStoppedTourRef.current = true
+      return
     }
 
-    // If auto tour is running, stop it on user interaction
+    // If SDK tour is running (started from toolbar), stop it
     if (autoTourState === "touring") {
-      void bridge.stopTour()
-      setAutoTourState("idle")
+      stopCustomTour()
+      userStoppedTourRef.current = true
+      return
     }
 
-    // Don't restart idle countdown while AI is analyzing
-    if (aiAnalyzingRef.current) return
+    // Don't restart idle countdown if user previously stopped a tour,
+    // or if AI is analyzing
+    if (userStoppedTourRef.current || aiAnalyzingRef.current) return
 
     // Restart idle countdown
     setAutoTourState("waiting")
     idleTimerRef.current = setTimeout(() => {
       if (status === "sdk-connected" && !isTourActive && !aiAnalyzingRef.current) {
-        void bridge.startTour().then((started) => {
-          if (started) {
-            setAutoTourState("touring")
-          }
-        })
+        void startCustomTour()
       }
     }, IDLE_TIMEOUT_MS)
-  }, [autoTourState, bridge, isTourActive, status])
+  }, [autoTourState, clearTimers, isTourActive, startCustomTour, status, stopCustomTour])
 
   // Start initial idle countdown when SDK connects
   useEffect(() => {
     if (status !== "sdk-connected") return
-
-    // Don't auto-start if user has already interacted or AI is analyzing
-    if (userInteractedRef.current || aiAnalyzingRef.current) return
+    if (userInteractedRef.current || aiAnalyzingRef.current || userStoppedTourRef.current) return
 
     idleTimerRef.current = setTimeout(() => {
       if (!isTourActive && !aiAnalyzingRef.current) {
-        void bridge.startTour().then((started) => {
-          if (started) {
-            setAutoTourState("touring")
-          }
-        })
+        void startCustomTour()
       }
     }, IDLE_TIMEOUT_MS)
 
@@ -91,7 +165,7 @@ export function useAutoTour(
         clearTimeout(idleTimerRef.current)
       }
     }
-  }, [bridge, isTourActive, status])
+  }, [isTourActive, startCustomTour, status])
 
   // Listen for user interaction events to reset idle timer
   useEffect(() => {
@@ -116,53 +190,34 @@ export function useAutoTour(
       for (const evt of events) {
         window.removeEventListener(evt, onInteraction)
       }
-      if (idleTimerRef.current) {
-        clearTimeout(idleTimerRef.current)
-      }
+      clearTimers()
     }
-  }, [resetIdleTimer])
+  }, [resetIdleTimer, clearTimers])
 
-  // Sync tour state from bridge
+  // Sync: if SDK tour stops externally (e.g. user clicked in 3D), update state
   useEffect(() => {
-    if (!isTourActive && autoTourState === "touring") {
-      // Tour ended naturally (finished all steps)
+    if (!isTourActive && autoTourState === "touring" && !customTourActiveRef.current) {
       setAutoTourState("idle")
-      // Restart idle timer to loop (only if not analyzing)
-      if (!aiAnalyzingRef.current) {
-        idleTimerRef.current = setTimeout(() => {
-          if (status === "sdk-connected" && !aiAnalyzingRef.current) {
-            void bridge.startTour().then((started) => {
-              if (started) {
-                setAutoTourState("touring")
-              }
-            })
-          }
-        }, IDLE_TIMEOUT_MS)
-      }
+      clearTimers()
     }
-  }, [autoTourState, bridge, isTourActive, status])
+  }, [autoTourState, clearTimers, isTourActive])
 
   const startAutoTour = useCallback(() => {
+    userStoppedTourRef.current = false
     if (status === "sdk-connected") {
-      void bridge.startTour().then((started) => {
-        if (started) {
-          setAutoTourState("touring")
-        }
-      })
+      void startCustomTour()
     }
-  }, [bridge, status])
+  }, [startCustomTour, status])
 
   const stopAutoTour = useCallback(() => {
-    void bridge.stopTour()
-    setAutoTourState("idle")
-    if (idleTimerRef.current) {
-      clearTimeout(idleTimerRef.current)
-      idleTimerRef.current = null
-    }
-  }, [bridge])
+    userStoppedTourRef.current = true
+    stopCustomTour()
+  }, [stopCustomTour])
 
   return {
     autoTourState,
+    tourSpeed,
+    setTourSpeed,
     startAutoTour,
     stopAutoTour,
   }

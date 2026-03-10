@@ -26,7 +26,6 @@ interface SweepData {
   sid: string
   position: Vector3
   floorInfo: { id: string; sequence: number } | undefined
-  room: string | undefined
   neighbors: string[]
   enabled: boolean
 }
@@ -37,10 +36,26 @@ interface FloorData {
   sequence: number
 }
 
+/** Our internal room type (uses `name`). */
 interface RoomData {
   id: string
   name: string
   bounds: { min: Vector3; max: Vector3 }
+}
+
+/** SDK room type (uses `label`, has extra fields). */
+interface SdkRoomData {
+  id: string
+  label: string
+  bounds: { min: Vector3; max: Vector3 }
+  center?: Vector3
+  size?: Vector3
+  floorInfo?: { id: string; sequence: number }
+}
+
+/** SDK Room.current returns an array of rooms the camera is in. */
+interface CurrentRooms {
+  rooms: SdkRoomData[]
 }
 
 interface TourSnapshot {
@@ -195,8 +210,8 @@ interface MpSdk {
     current: Observable<{ id: string; sequence: number } | undefined>
   }
   Room: {
-    current: Observable<RoomData | undefined>
-    data: CollectionObservable<RoomData>
+    current: Observable<CurrentRooms>
+    data: CollectionObservable<SdkRoomData>
   }
   Pointer: {
     intersection: Observable<PointerIntersection>
@@ -480,16 +495,39 @@ export class MatterportBridge {
       return false
     }
 
-    // Find sweeps belonging to this room
+    const room = this._rooms.find((r) => r.id === roomId)
+    if (!room?.bounds) {
+      return false
+    }
+
+    // Find enabled sweeps whose position falls within this room's bounds
+    const b = room.bounds
     const roomSweeps = this._sweeps.filter(
-      (sweep) => sweep.room === roomId && sweep.enabled
+      (sweep) =>
+        sweep.enabled &&
+        sweep.position.x >= b.min.x && sweep.position.x <= b.max.x &&
+        sweep.position.y >= b.min.y && sweep.position.y <= b.max.y &&
+        sweep.position.z >= b.min.z && sweep.position.z <= b.max.z
     )
     if (roomSweeps.length === 0) {
       return false
     }
 
-    // Pick the first enabled sweep in this room
-    return this.navigateToSweep(roomSweeps[0].sid, { transition: "fly" })
+    // Pick the sweep closest to the room center
+    const cx = (b.min.x + b.max.x) / 2
+    const cy = (b.min.y + b.max.y) / 2
+    const cz = (b.min.z + b.max.z) / 2
+    let best = roomSweeps[0]
+    let bestDist = Infinity
+    for (const s of roomSweeps) {
+      const d = (s.position.x - cx) ** 2 + (s.position.y - cy) ** 2 + (s.position.z - cz) ** 2
+      if (d < bestDist) {
+        bestDist = d
+        best = s
+      }
+    }
+
+    return this.navigateToSweep(best.sid, { transition: "fly" })
   }
 
   async setViewMode(mode: ViewMode): Promise<boolean> {
@@ -550,7 +588,7 @@ export class MatterportBridge {
       await this.sdk.Tour.start(startIndex)
       return true
     } catch (error) {
-      console.error("startTour failed:", error)
+      // Expected SDK behavior — another transition is active, silently return false
       return false
     }
   }
@@ -1208,7 +1246,8 @@ export class MatterportBridge {
     }
 
     // Separate candidates: same room vs cross-room (doorway transitions)
-    const currentRoomId = current.room
+    const currentRoomInferred = this.inferRoomFromPosition(current.position)
+    const currentRoomId = currentRoomInferred?.id
     const sameRoom: Array<{ sweep: SweepData; score: number }> = []
     const crossRoom: Array<{ sweep: SweepData; score: number }> = []
 
@@ -1230,8 +1269,9 @@ export class MatterportBridge {
       // Room boundary check: verify the midpoint lies within a known room
       if (!this.isPathClearOfWalls(current.position, sweep.position)) continue
 
+      const sweepRoom = this.inferRoomFromPosition(sweep.position)
       const bucket =
-        currentRoomId != null && sweep.room === currentRoomId
+        currentRoomId != null && sweepRoom?.id === currentRoomId
           ? sameRoom
           : crossRoom
       bucket.push({ sweep, score })
@@ -1284,6 +1324,37 @@ export class MatterportBridge {
         mid.z >= room.bounds.min.z &&
         mid.z <= room.bounds.max.z
     )
+  }
+
+  /**
+   * Find which room a 3D position falls within, using AABB bounds.
+   * Returns the best-fit room or undefined if outside all rooms.
+   */
+  private inferRoomFromPosition(pos: Vector3): RoomData | undefined {
+    let bestRoom: RoomData | undefined
+    let bestVolume = Infinity
+
+    for (const room of this._rooms) {
+      if (!room.bounds?.min || !room.bounds?.max) continue
+      const b = room.bounds
+      if (
+        pos.x >= b.min.x && pos.x <= b.max.x &&
+        pos.y >= b.min.y && pos.y <= b.max.y &&
+        pos.z >= b.min.z && pos.z <= b.max.z
+      ) {
+        // If position is inside multiple overlapping rooms, pick the smallest
+        const vol =
+          (b.max.x - b.min.x) *
+          (b.max.y - b.min.y) *
+          (b.max.z - b.min.z)
+        if (vol < bestVolume) {
+          bestVolume = vol
+          bestRoom = room
+        }
+      }
+    }
+
+    return bestRoom
   }
 
   // -----------------------------------------------------------------------
@@ -1614,25 +1685,47 @@ export class MatterportBridge {
     })
     this.subscriptions = [...this.subscriptions, poseSub]
 
-    // Current sweep
-    const sweepSub = sdk.Sweep.current.subscribe((sweep: SweepData) => {
+    // Current sweep — also infer room from sweep position when SDK Room.current
+    // doesn't fire (some models lack proper room boundaries)
+    const currentSweepSub = sdk.Sweep.current.subscribe((sweep: SweepData) => {
       this._currentSweep = { ...sweep }
       for (const cb of this.sweepChangeCallbacks) {
         cb({ ...sweep })
       }
-    })
-    this.subscriptions = [...this.subscriptions, sweepSub]
 
-    // Current room
-    const roomSub = sdk.Room.current.subscribe(
-      (room: RoomData | undefined) => {
-        this._currentRoom = room ? { ...room } : undefined
-        for (const cb of this.roomChangeCallbacks) {
-          cb(room ? { ...room } : undefined)
+      // Infer room from sweep position via bounds check
+      if (sweep.sid && this._rooms.length > 0) {
+        const inferred = this.inferRoomFromPosition(sweep.position)
+        if (inferred) {
+          const prevRoomId = this._currentRoom?.id
+          if (inferred.id !== prevRoomId) {
+            this._currentRoom = { ...inferred }
+            for (const cb of this.roomChangeCallbacks) {
+              cb({ ...inferred })
+            }
+          }
+        }
+      }
+    })
+    this.subscriptions = [...this.subscriptions, currentSweepSub]
+
+    // Current room — SDK returns { rooms: SdkRoomData[] }
+    const currentRoomSub = sdk.Room.current.subscribe(
+      (data: CurrentRooms) => {
+        const sdkRoom = data?.rooms?.[0]
+        const mapped: RoomData | undefined = sdkRoom
+          ? { id: sdkRoom.id, name: sdkRoom.label ?? sdkRoom.id, bounds: sdkRoom.bounds }
+          : undefined
+        const prevId = this._currentRoom?.id
+        if (mapped?.id !== prevId) {
+          this._currentRoom = mapped
+          for (const cb of this.roomChangeCallbacks) {
+            cb(mapped)
+          }
         }
       }
     )
-    this.subscriptions = [...this.subscriptions, roomSub]
+    this.subscriptions = [...this.subscriptions, currentRoomSub]
 
     // Current floor
     const floorSub = sdk.Floor.current.subscribe(
@@ -1727,14 +1820,17 @@ export class MatterportBridge {
     })
     this.subscriptions = [...this.subscriptions, sweepSub]
 
-    // Load rooms via collection observable
+    // Load rooms via collection observable — SDK rooms use `label`, map to our `name`
     const roomSub = sdk.Room.data.subscribe({
       onCollectionUpdated: (collection) => {
-        if (collection instanceof Map) {
-          this._rooms = Array.from(collection.values())
-        } else {
-          this._rooms = [...collection]
-        }
+        const sdkRooms: SdkRoomData[] = collection instanceof Map
+          ? Array.from(collection.values())
+          : [...collection]
+        this._rooms = sdkRooms.map((r) => ({
+          id: r.id,
+          name: r.label ?? r.id,
+          bounds: r.bounds,
+        }))
       },
     })
     this.subscriptions = [...this.subscriptions, roomSub]

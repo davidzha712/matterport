@@ -4,8 +4,10 @@ import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
 import { motion, useReducedMotion, AnimatePresence } from "framer-motion"
 import { AIProgressOverlay } from "@/components/ai-progress-overlay"
+import { ApprovalProgressBar } from "@/components/approval-progress-bar"
 import { CommandBar } from "@/components/command-bar"
 import { ContextPanel } from "@/components/context-panel"
+import { FilmstripNav } from "@/components/filmstrip-nav"
 import { InteractionDialog } from "@/components/interaction-dialog"
 import { MatterportStage } from "@/components/matterport-stage"
 import { MeasureTool } from "@/components/measure-tool"
@@ -57,13 +59,14 @@ function ImmersiveShellInner({
     setRole,
     setShowDialog,
   } = useImmersiveMode(bridge)
-  const { autoTourState, stopAutoTour } = useAutoTour(bridge, status, isTourActive)
+  const { autoTourState, tourSpeed, setTourSpeed, stopAutoTour } = useAutoTour(bridge, status, isTourActive)
   const modeConfig = getStageModeConfig(focusMode)
   const [showDimensions, setShowDimensions] = useState(false)
   const [measureActive, setMeasureActive] = useState(false)
   const [modelName, setModelName] = useState<string | null>(null)
   const [apiObjects, setApiObjects] = useState<ObjectRecord[]>([])
   const [apiObjectCount, setApiObjectCount] = useState<number | null>(null)
+  const [roomTransitionName, setRoomTransitionName] = useState<string | null>(null)
 
   // V key → capture screenshot then auto-vision analysis in immersive mode
   const triggerVisionAnalysis = useCallback(async () => {
@@ -130,6 +133,14 @@ function ImmersiveShellInner({
     window.addEventListener("objects-updated", onUpdated)
     return () => window.removeEventListener("objects-updated", onUpdated)
   }, [space.id])
+
+  // Explore mode — room transition chip
+  useEffect(() => {
+    if (focusMode !== "explore" || !sdkRoom?.name) return
+    setRoomTransitionName(sdkRoom.name)
+    const timer = setTimeout(() => setRoomTransitionName(null), 3000)
+    return () => clearTimeout(timer)
+  }, [focusMode, sdkRoom?.name])
 
   // Compute room dimensions from SDK bounds (meters)
   const roomDimensions = sdkRoom?.bounds
@@ -204,7 +215,26 @@ function ImmersiveShellInner({
       id="main-content"
     >
       <MatterportStage space={space}>
+        {/* Work mode — status bar */}
+        {focusMode === "work" ? (
+          <div className="work-status-bar" aria-label={t.stage.mode + ": " + stageModeLabels[focusMode]}>
+            <div className="work-status-bar__item">
+              <span className={`work-status-bar__dot work-status-bar__dot--${status === "sdk-connected" ? "connected" : status === "iframe-only" ? "connecting" : "disconnected"}`} />
+              <span>{status === "sdk-connected" ? "SDK" : status === "iframe-only" ? "Iframe" : "..."}</span>
+            </div>
+            <span className="work-status-bar__sep" aria-hidden="true">|</span>
+            <div className="work-status-bar__item">
+              <span>{t.objects.room}: {sdkRoom?.name ?? "---"}</span>
+            </div>
+            <span className="work-status-bar__sep" aria-hidden="true">|</span>
+            <div className="work-status-bar__item">
+              <span>{t.common.objects}: {apiObjectCount ?? 0}</span>
+            </div>
+          </div>
+        ) : null}
+
         {/* Top bar */}
+        {modeConfig.topbarVariant !== "hidden" ? (
         <motion.header
           animate={topbarAnimate}
           className="immersive-topbar immersive-topbar--floating"
@@ -213,37 +243,68 @@ function ImmersiveShellInner({
           transition={{ duration: isImmersive ? immersiveDur : dur, ease }}
         >
           <div className="immersive-topbar__brand">
-            <div className="immersive-breadcrumbs">
-              <span>{space.projectName}</span>
-              <span>{space.name}</span>
-              <span>{stageModeLabels[focusMode]}</span>
-            </div>
-            <p className="eyebrow">{t.hero.eyebrow}</p>
-            <h1>{space.projectName}</h1>
+            {modeConfig.topbarVariant !== "minimal" ? (
+              <>
+                <div className="immersive-breadcrumbs">
+                  <span>{space.projectName}</span>
+                  <span>{space.name}</span>
+                  <span>{stageModeLabels[focusMode]}</span>
+                </div>
+                <p className="eyebrow">{t.hero.eyebrow}</p>
+                <h1>{space.projectName}</h1>
+              </>
+            ) : (
+              <div className="immersive-breadcrumbs">
+                <span>{space.name}</span>
+                <span>{stageModeLabels[focusMode]}</span>
+              </div>
+            )}
           </div>
-          <nav aria-label="Global">
-            <ul className="inline-nav">
-              <li>
-                <Link href="/">{t.stage.overview}</Link>
-              </li>
-              <li>
-                <Link href="/settings/providers">{t.stage.providers}</Link>
-              </li>
-              <li>
-                <Link href="/review-center">{t.stage.reviewCenter}</Link>
-              </li>
-              <li>
-                <Link href="/export-center">{t.stage.export}</Link>
-              </li>
-              <li>
-                <Link href={buildSpaceRoute(space.id, "review")}>{t.stage.stageReview}</Link>
-              </li>
-              <li className="inline-nav__locale">
-                <LocaleSwitcher />
-              </li>
-            </ul>
-          </nav>
+          {modeConfig.showApprovalProgress ? (
+            <ApprovalProgressBar
+              reviewed={space.workflow?.reviewedCount ?? runtimeRooms.filter(r => r.pendingReviewCount === 0).length}
+              total={runtimeRooms.length}
+            />
+          ) : null}
+          {modeConfig.showGlobalNav ? (
+            <nav aria-label="Global">
+              <ul className="inline-nav">
+                <li>
+                  <Link href="/">{t.stage.overview}</Link>
+                </li>
+                <li>
+                  <Link href="/settings/providers">{t.stage.providers}</Link>
+                </li>
+                <li>
+                  <Link href="/review-center">{t.stage.reviewCenter}</Link>
+                </li>
+                <li>
+                  <Link href="/export-center">{t.stage.export}</Link>
+                </li>
+                <li>
+                  <Link href={buildSpaceRoute(space.id, "review")}>{t.stage.stageReview}</Link>
+                </li>
+                <li className="inline-nav__locale">
+                  <LocaleSwitcher />
+                </li>
+              </ul>
+            </nav>
+          ) : (
+            <div className="immersive-topbar__minimal-nav">
+              {modeConfig.showShareButton ? (
+                <button
+                  className="listing-share-btn"
+                  onClick={() => { void navigator.clipboard.writeText(window.location.href) }}
+                  type="button"
+                >
+                  {t.listingPrep.share}
+                </button>
+              ) : null}
+              <LocaleSwitcher />
+            </div>
+          )}
         </motion.header>
+        ) : null}
 
         {/* Left panel: intro + command bar */}
         {modeConfig.panels.leftPanel ? (
@@ -266,6 +327,16 @@ function ImmersiveShellInner({
               ) : modeConfig.introCardVariant === "sell-focused" ? (
                 <>
                   <p>{bridge.modelDetails?.summary ?? bridge.modelDetails?.description ?? space.summary}</p>
+                  <div className="listing-highlights">
+                    <div className="listing-highlights__item">
+                      <div className="listing-highlights__value">{runtimeRooms.length}</div>
+                      <div className="listing-highlights__label">{t.listingPrep.rooms}</div>
+                    </div>
+                    <div className="listing-highlights__item">
+                      <div className="listing-highlights__value">{status === "sdk-connected" ? (apiObjectCount ?? 0) : (apiObjectCount ?? space.objects.length)}</div>
+                      <div className="listing-highlights__label">{t.common.objects}</div>
+                    </div>
+                  </div>
                   <div className="stage-intro-card__sell-badge">{t.listingPrep.badge}</div>
                 </>
               ) : (
@@ -274,7 +345,6 @@ function ImmersiveShellInner({
               <ul className="stage-intro-card__metrics">
                 <li>{runtimeRooms.length} {t.stage.roomsCaptured}</li>
                 <li>{status === "sdk-connected" ? (apiObjectCount ?? 0) : (apiObjectCount ?? space.objects.length)} {t.stage.objectsTracked}</li>
-                <li>{t.stage.mode}: {stageModeLabels[focusMode]}</li>
                 {modeConfig.showReviewCounts ? (
                   <li>{runtimeRooms.reduce((sum, r) => sum + r.pendingReviewCount, 0)} {t.workflow.needsReview}</li>
                 ) : null}
@@ -326,12 +396,30 @@ function ImmersiveShellInner({
           currentRoom={sdkRoom}
           measureActive={measureActive}
           onMeasureToggle={() => setMeasureActive((v) => !v)}
+          tourSpeed={tourSpeed}
+          onTourSpeedChange={setTourSpeed}
           toolbarConfig={modeConfig.toolbar}
         />
         {modeConfig.toolbar.measure ? (
           <MeasureTool active={measureActive} onClose={() => setMeasureActive(false)} />
         ) : null}
         <AIProgressOverlay />
+
+        {/* Explore mode — room transition chip */}
+        <AnimatePresence>
+          {focusMode === "explore" && roomTransitionName ? (
+            <motion.div
+              className="explore-room-chip"
+              initial={{ opacity: 0, y: -20, x: "-50%" }}
+              animate={{ opacity: 1, y: 0, x: "-50%" }}
+              exit={{ opacity: 0, y: -20, x: "-50%" }}
+              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              key={roomTransitionName}
+            >
+              {roomTransitionName}
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
 
         {/* Bottom chrome */}
         <motion.footer
@@ -357,6 +445,9 @@ function ImmersiveShellInner({
               </button>
             ) : null}
           </div>
+          {modeConfig.showFilmstrip ? (
+            <FilmstripNav rooms={runtimeRooms} currentRoom={focalRoom} spaceId={space.id} />
+          ) : null}
           <ModeRail currentMode={focusMode} spaceId={space.id} />
         </motion.footer>
 

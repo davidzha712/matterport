@@ -3,12 +3,15 @@
 import { useCallback, useEffect, useState } from "react"
 import type { MatterportBridge, ViewMode, RoomData } from "@/lib/matterport-bridge"
 import { useT } from "@/lib/i18n"
+import type { TourSpeed } from "@/lib/use-auto-tour"
 
 type StageToolbarProps = {
   bridge: MatterportBridge
   currentRoom?: RoomData
   measureActive?: boolean
   onMeasureToggle?: () => void
+  tourSpeed?: TourSpeed
+  onTourSpeedChange?: (speed: TourSpeed) => void
   toolbarConfig?: {
     viewModes: boolean
     tour: boolean
@@ -20,7 +23,7 @@ type StageToolbarProps = {
 
 type TourState = "idle" | "playing" | "paused"
 
-export function StageToolbar({ bridge, currentRoom, measureActive, onMeasureToggle, toolbarConfig }: StageToolbarProps) {
+export function StageToolbar({ bridge, currentRoom, measureActive, onMeasureToggle, tourSpeed, onTourSpeedChange, toolbarConfig }: StageToolbarProps) {
   const t = useT()
   const [currentMode, setCurrentMode] = useState<ViewMode>("inside")
   const [tourState, setTourState] = useState<TourState>("idle")
@@ -119,7 +122,7 @@ export function StageToolbar({ bridge, currentRoom, measureActive, onMeasureTogg
 
   return (
     <div className="stage-toolbar">
-      {toolbarConfig?.viewModes !== false && (
+      {toolbarConfig?.viewModes === true && (
         <>
           <div className="stage-toolbar__group" role="group" aria-label={t.stage.mode}>
             {(Object.keys(viewModeLabels) as ViewMode[]).map((mode) => (
@@ -139,7 +142,7 @@ export function StageToolbar({ bridge, currentRoom, measureActive, onMeasureTogg
         </>
       )}
 
-      {toolbarConfig?.tour !== false && (
+      {toolbarConfig?.tour === true && (
       <div className="stage-toolbar__group" role="group" aria-label={t.tour.autoTour}>
         {tourState === "playing" ? (
           <>
@@ -179,10 +182,25 @@ export function StageToolbar({ bridge, currentRoom, measureActive, onMeasureTogg
             {t.tour.autoTour}
           </button>
         )}
+        {onTourSpeedChange && (
+          <div className="stage-toolbar__speed" role="group" aria-label={t.tour.speed}>
+            {(["slow", "normal", "fast"] as const).map((speed) => (
+              <button
+                key={speed}
+                className={`stage-toolbar__speed-btn${tourSpeed === speed ? " stage-toolbar__speed-btn--active" : ""}`}
+                onClick={() => onTourSpeedChange(speed)}
+                title={t.tour[speed]}
+                type="button"
+              >
+                {t.tour[speed]}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       )}
 
-      {toolbarConfig?.screenshot !== false && (
+      {toolbarConfig?.screenshot === true && (
         <>
           <div className="stage-toolbar__divider" aria-hidden="true" />
 
@@ -198,7 +216,7 @@ export function StageToolbar({ bridge, currentRoom, measureActive, onMeasureTogg
         </>
       )}
 
-      {toolbarConfig?.measure !== false && onMeasureToggle ? (
+      {toolbarConfig?.measure === true && onMeasureToggle ? (
         <button
           className={`stage-toolbar__btn${measureActive ? " stage-toolbar__btn--active" : ""}`}
           disabled={!sdkReady}
@@ -210,7 +228,7 @@ export function StageToolbar({ bridge, currentRoom, measureActive, onMeasureTogg
         </button>
       ) : null}
 
-      {toolbarConfig?.aiDetect !== false && (
+      {toolbarConfig?.aiDetect === true && (
         <button
           className="stage-toolbar__btn stage-toolbar__btn--accent"
           disabled={!sdkReady || analysisStatus !== null}

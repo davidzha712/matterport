@@ -79,6 +79,10 @@ export const translations = {
       prevStop: "Vorheriger Halt",
       tourActive: "Führung läuft",
       autoTour: "Auto-Führung",
+      speed: "Geschwindigkeit",
+      slow: "Langsam",
+      normal: "Normal",
+      fast: "Schnell",
     },
     ai: {
       detectObjects: "Objekte erkennen",
@@ -272,7 +276,20 @@ export const translations = {
       familyNotes: "Familiennotizen und Kuratorhinweise bekommen eigene Slots.",
       aiVerifiable: "Jede KI-Ausgabe bleibt prüfbar und nachvollziehbar.",
     },
-    listingPrep: { badge: "Listing Prep" },
+    listingPrep: {
+      badge: "Listing Prep",
+      share: "Teilen",
+      rooms: "Zimmer",
+    },
+    storyMode: {
+      narrativeIntro: "Die Geschichte dieses Raumes",
+      nextScene: "Nächste Szene",
+    },
+    reviewMode: {
+      approvalProgress: "Prüffortschritt",
+      reviewed: "Geprüft",
+      total: "Gesamt",
+    },
     commandBar: {
       stepInit: "Vorbereitung…",
       stepSearch: "Web-Kontext wird gesucht…",
@@ -304,6 +321,10 @@ export const translations = {
       markerLabel: "Bezeichnung",
       markerDescription: "Beschreibung (optional)",
       place: "Setzen",
+    },
+    annotationMode: {
+      badge: "Markierungsmodus",
+      hint: "Option gedrückt halten — Klicken zum Markieren",
     },
   },
   en: {
@@ -386,6 +407,10 @@ export const translations = {
       prevStop: "Previous Stop",
       tourActive: "Tour Active",
       autoTour: "Auto Tour",
+      speed: "Speed",
+      slow: "Slow",
+      normal: "Normal",
+      fast: "Fast",
     },
     ai: {
       detectObjects: "Detect Objects",
@@ -579,7 +604,20 @@ export const translations = {
       familyNotes: "Family notes and curator hints will get their own slots.",
       aiVerifiable: "Every AI output remains verifiable and traceable.",
     },
-    listingPrep: { badge: "Listing Prep" },
+    listingPrep: {
+      badge: "Listing Prep",
+      share: "Share",
+      rooms: "Rooms",
+    },
+    storyMode: {
+      narrativeIntro: "The story of this space",
+      nextScene: "Next Scene",
+    },
+    reviewMode: {
+      approvalProgress: "Approval Progress",
+      reviewed: "Reviewed",
+      total: "Total",
+    },
     commandBar: {
       stepInit: "Initializing…",
       stepSearch: "Searching web context…",
@@ -611,6 +649,10 @@ export const translations = {
       markerLabel: "Label",
       markerDescription: "Description (optional)",
       place: "Place",
+    },
+    annotationMode: {
+      badge: "Annotation Mode",
+      hint: "Hold Option — click to annotate",
     },
   },
 } satisfies Record<string, Record<string, Record<string, string>>>

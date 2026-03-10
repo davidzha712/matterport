@@ -98,7 +98,7 @@ export function ContextPanel({ panelConfig, providers, selectedObject, selectedR
   return (
     <aside className="context-panel" aria-label={t.stage.roomContext}>
       <div className="context-panel__handle" aria-hidden="true" />
-      {panelConfig?.objectWorkflowCard !== false ? (
+      {panelConfig?.objectWorkflowCard === true ? (
         <ObjectWorkflowCard objectRecord={focalObject} objectRoute={objectRoute} spaceId={space.id} />
       ) : null}
 
@@ -108,7 +108,7 @@ export function ContextPanel({ panelConfig, providers, selectedObject, selectedR
             <p className="eyebrow">{t.objects.room}</p>
             <h2>{focalRoom.name}</h2>
           </div>
-          {showReviewCounts !== false ? (
+          {showReviewCounts === true ? (
             <span className="pill pill--active">{focalRoom.pendingReviewCount} {t.workflow.needsReview.toLowerCase()}</span>
           ) : null}
         </div>
@@ -168,7 +168,7 @@ export function ContextPanel({ panelConfig, providers, selectedObject, selectedR
       </section>
 
       {/* AI-detected objects for current room */}
-      {panelConfig?.aiDetections !== false && detectedObjects.length > 0 ? (
+      {panelConfig?.aiDetections === true && detectedObjects.length > 0 ? (
         <section className="context-card">
           <div className="section-heading">
             <div>
@@ -220,7 +220,7 @@ export function ContextPanel({ panelConfig, providers, selectedObject, selectedR
           <li>{t.contextPanel.aiVerifiable}</li>
         </ul>
       </section>
-      {panelConfig?.workflowSidebar !== false ? (
+      {panelConfig?.workflowSidebar === true ? (
         <WorkflowSidebar providers={providers} spaceId={space.id} />
       ) : null}
       <Link className="primary-link" href="/settings/providers">

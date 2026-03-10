@@ -12,6 +12,8 @@ type MenuView = "actions" | "add-marker"
 type StageContextMenuProps = {
   spaceId: string
   roomName?: string
+  annotationMode: boolean
+  onExitAnnotationMode: () => void
 }
 
 function distanceSq(
@@ -24,7 +26,12 @@ function distanceSq(
   return dx * dx + dy * dy + dz * dz
 }
 
-export function StageContextMenu({ spaceId, roomName }: StageContextMenuProps) {
+export function StageContextMenu({
+  spaceId,
+  roomName,
+  annotationMode,
+  onExitAnnotationMode,
+}: StageContextMenuProps) {
   const { bridge, status } = useBridge()
   const t = useT()
 
@@ -50,7 +57,7 @@ export function StageContextMenu({ spaceId, roomName }: StageContextMenuProps) {
     return unsub
   }, [bridge, status])
 
-  // Track cursor screen position globally (for M key fallback)
+  // Track cursor screen position globally
   useEffect(() => {
     function onMove(e: MouseEvent) {
       lastCursorRef.current = { x: e.clientX, y: e.clientY }
@@ -81,17 +88,12 @@ export function StageContextMenu({ spaceId, roomName }: StageContextMenuProps) {
     setFeedback(null)
   }, [])
 
-  // Right-click: document-level contextmenu listener.
-  // The contextmenu event fires on the parent document even when the user
-  // right-clicks over a cross-origin iframe (target = iframe element).
-  // No overlay with pointer-events:auto needed — this preserves Matterport navigation.
+  // Right-click on document (works even over cross-origin iframe in some cases)
   useEffect(() => {
     function handleContextMenu(e: MouseEvent) {
       const target = e.target as HTMLElement
-      // Only handle right-clicks within the stage area
       if (!target.closest(".stage-shell")) return
-      // Don't intercept right-clicks on our own UI chrome (buttons, inputs, etc.)
-      if (target.closest(".stage-toolbar, .command-bar, .context-panel, .immersive-topbar, .stage-context-menu")) return
+      if (target.closest(".stage-toolbar, .command-bar, .context-panel, .immersive-topbar, .stage-context-menu, .annotation-toggle")) return
 
       e.preventDefault()
       openMenuAt(e.clientX, e.clientY)
@@ -101,6 +103,24 @@ export function StageContextMenu({ spaceId, roomName }: StageContextMenuProps) {
     return () => document.removeEventListener("contextmenu", handleContextMenu)
   }, [openMenuAt])
 
+  // Annotation mode: click on the overlay opens context menu
+  useEffect(() => {
+    if (!annotationMode) return
+
+    function handleOverlayClick(e: MouseEvent) {
+      const target = e.target as HTMLElement
+      if (!target.classList.contains("stage-interaction-overlay--active")) return
+      if (target.closest(".stage-context-menu")) return
+
+      e.preventDefault()
+      e.stopPropagation()
+      openMenuAt(e.clientX, e.clientY)
+    }
+
+    document.addEventListener("click", handleOverlayClick, true)
+    return () => document.removeEventListener("click", handleOverlayClick, true)
+  }, [annotationMode, openMenuAt])
+
   // M key: open context menu at last known cursor position
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -108,7 +128,6 @@ export function StageContextMenu({ spaceId, roomName }: StageContextMenuProps) {
       const target = e.target as HTMLElement
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return
 
-      // Check if cursor is over the stage area
       const stageShell = document.querySelector(".stage-shell")
       if (!stageShell) return
 
@@ -197,13 +216,17 @@ export function StageContextMenu({ spaceId, roomName }: StageContextMenuProps) {
     )
 
     setFeedback("\u2713")
-    setTimeout(closeMenu, 600)
-  }, [bridge, label, description, spaceId, roomName, closeMenu, sdkConnected])
+    setTimeout(() => {
+      closeMenu()
+      onExitAnnotationMode()
+    }, 600)
+  }, [bridge, label, description, spaceId, roomName, closeMenu, sdkConnected, onExitAnnotationMode])
 
   const handleDetectObjects = useCallback(() => {
     window.dispatchEvent(new CustomEvent("auto-vision-analyze"))
     closeMenu()
-  }, [closeMenu])
+    onExitAnnotationMode()
+  }, [closeMenu, onExitAnnotationMode])
 
   const handleNavigateHere = useCallback(async () => {
     const intersection = lastIntersectionRef.current
@@ -234,7 +257,8 @@ export function StageContextMenu({ spaceId, roomName }: StageContextMenuProps) {
     }
 
     closeMenu()
-  }, [bridge, closeMenu, sdkConnected])
+    onExitAnnotationMode()
+  }, [bridge, closeMenu, sdkConnected, onExitAnnotationMode])
 
   if (!menuPos) return null
 
