@@ -23,6 +23,8 @@ export function useAutoTour(
 ) {
   const [autoTourState, setAutoTourState] = useState<AutoTourState>("idle")
   const [tourSpeed, setTourSpeed] = useState<TourSpeed>("normal")
+  const tourSpeedRef = useRef<TourSpeed>(tourSpeed)
+  tourSpeedRef.current = tourSpeed
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const stepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const userInteractedRef = useRef(false)
@@ -61,6 +63,8 @@ export function useAutoTour(
   }, [clearTimers])
 
   // Custom stepped tour: advance to next snapshot with speed-controlled pause
+  // Uses tourSpeedRef instead of tourSpeed closure to avoid stale-closure bug
+  // in recursive setTimeout chains.
   const advanceCustomTour = useCallback(async () => {
     if (!customTourActiveRef.current) return
 
@@ -78,11 +82,11 @@ export function useAutoTour(
     const stepped = await bridge.stepTour(nextIndex)
     if (!stepped || !customTourActiveRef.current) return
 
-    // Schedule next step after speed-controlled pause
+    // Schedule next step after speed-controlled pause (read current speed from ref)
     stepTimerRef.current = setTimeout(() => {
       void advanceCustomTour()
-    }, SPEED_PAUSE_MS[tourSpeed])
-  }, [bridge, tourSpeed])
+    }, SPEED_PAUSE_MS[tourSpeedRef.current])
+  }, [bridge])
 
   // Start a custom stepped tour (speed-controllable)
   const startCustomTour = useCallback(async () => {
@@ -106,7 +110,8 @@ export function useAutoTour(
     setAutoTourState("idle")
   }, [bridge, clearTimers])
 
-  // When speed changes mid-tour, restart the step timer with new delay
+  // When speed changes mid-tour, restart the current step timer immediately
+  // so the new pause duration takes effect without waiting for the old timer
   useEffect(() => {
     if (!customTourActiveRef.current) return
     if (stepTimerRef.current) {

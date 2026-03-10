@@ -21,10 +21,9 @@ export function LandingContent({ projects }: LandingContentProps) {
       <section className="landing__hero">
         {featuredSpace?.matterportModelSid ? (
           <iframe
-            allow="fullscreen; xr-spatial-tracking"
+            allow="fullscreen; xr-spatial-tracking; accelerometer; gyroscope"
             className="landing__hero-embed"
             loading="eager"
-            referrerPolicy="strict-origin-when-cross-origin"
             src={getMatterportEmbedUrl(featuredSpace.matterportModelSid)}
             title={featuredSpace.name}
           />
@@ -78,10 +77,10 @@ export function LandingContent({ projects }: LandingContentProps) {
                 <div className="space-card__visual">
                   {space.matterportModelSid ? (
                     <iframe
+                      allow="fullscreen; xr-spatial-tracking; accelerometer; gyroscope"
                       className="space-card__embed"
                       loading="lazy"
-                      referrerPolicy="strict-origin-when-cross-origin"
-                      src={`https://my.matterport.com/show/?m=${space.matterportModelSid}&play=1&qs=1&brand=0&title=0&help=0&gt=0&hr=0&mls=2&mt=0`}
+                      src={getMatterportEmbedUrl(space.matterportModelSid)}
                       title={space.name}
                     />
                   ) : (

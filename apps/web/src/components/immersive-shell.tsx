@@ -59,7 +59,7 @@ function ImmersiveShellInner({
     setRole,
     setShowDialog,
   } = useImmersiveMode(bridge)
-  const { autoTourState, tourSpeed, setTourSpeed, stopAutoTour } = useAutoTour(bridge, status, isTourActive)
+  const { autoTourState, tourSpeed, setTourSpeed, startAutoTour, stopAutoTour } = useAutoTour(bridge, status, isTourActive)
   const modeConfig = getStageModeConfig(focusMode)
   const [showDimensions, setShowDimensions] = useState(false)
   const [measureActive, setMeasureActive] = useState(false)
@@ -399,6 +399,9 @@ function ImmersiveShellInner({
           onMeasureToggle={() => setMeasureActive((v) => !v)}
           tourSpeed={tourSpeed}
           onTourSpeedChange={setTourSpeed}
+          onTourStart={startAutoTour}
+          onTourStop={stopAutoTour}
+          isTourPlaying={autoTourState === "touring"}
           toolbarConfig={modeConfig.toolbar}
         />
         {modeConfig.toolbar.measure ? (

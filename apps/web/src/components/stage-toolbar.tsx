@@ -12,6 +12,9 @@ type StageToolbarProps = {
   onMeasureToggle?: () => void
   tourSpeed?: TourSpeed
   onTourSpeedChange?: (speed: TourSpeed) => void
+  onTourStart?: () => void
+  onTourStop?: () => void
+  isTourPlaying?: boolean
   toolbarConfig?: {
     viewModes: boolean
     tour: boolean
@@ -23,7 +26,7 @@ type StageToolbarProps = {
 
 type TourState = "idle" | "playing" | "paused"
 
-export function StageToolbar({ bridge, currentRoom, measureActive, onMeasureToggle, tourSpeed, onTourSpeedChange, toolbarConfig }: StageToolbarProps) {
+export function StageToolbar({ bridge, currentRoom, measureActive, onMeasureToggle, tourSpeed, onTourSpeedChange, onTourStart, onTourStop, isTourPlaying, toolbarConfig }: StageToolbarProps) {
   const t = useT()
   const [currentMode, setCurrentMode] = useState<ViewMode>("inside")
   const [tourState, setTourState] = useState<TourState>("idle")
@@ -69,6 +72,13 @@ export function StageToolbar({ bridge, currentRoom, measureActive, onMeasureTogg
     }
   }, [bridge])
 
+  // Sync with external tour state (from useAutoTour)
+  useEffect(() => {
+    if (isTourPlaying !== undefined) {
+      setTourState(isTourPlaying ? "playing" : "idle")
+    }
+  }, [isTourPlaying])
+
   const handleModeSwitch = useCallback(
     (mode: ViewMode) => {
       void bridge.setViewMode(mode)
@@ -78,13 +88,21 @@ export function StageToolbar({ bridge, currentRoom, measureActive, onMeasureTogg
 
   const handleTourToggle = useCallback(() => {
     if (tourState === "playing") {
-      void bridge.stopTour()
+      if (onTourStop) {
+        onTourStop()
+      } else {
+        void bridge.stopTour()
+      }
       setTourState("idle")
     } else {
-      void bridge.startTour()
+      if (onTourStart) {
+        onTourStart()
+      } else {
+        void bridge.startTour()
+      }
       setTourState("playing")
     }
-  }, [bridge, tourState])
+  }, [bridge, onTourStart, onTourStop, tourState])
 
   const handleTourNext = useCallback(() => {
     void bridge.nextTourStep()

@@ -2712,10 +2712,10 @@ ul {
   z-index: 1;
   background: linear-gradient(
     to top,
-    var(--bg) 0%,
-    rgba(8, 17, 26, 0.85) 30%,
-    rgba(8, 17, 26, 0.4) 60%,
-    transparent 100%
+    rgba(8, 17, 26, 0.7) 0%,
+    rgba(8, 17, 26, 0.35) 25%,
+    rgba(8, 17, 26, 0.1) 50%,
+    transparent 70%
   );
   pointer-events: none;
 }
@@ -2762,9 +2762,13 @@ ul {
 .landing__hero-content {
   position: relative;
   z-index: 5;
-  padding: 0 32px 80px;
+  padding: 32px 32px 80px;
   max-width: 680px;
   pointer-events: none;
+  background: linear-gradient(135deg, rgba(8, 17, 26, 0.75), rgba(8, 17, 26, 0.55));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 0 20px 0 0;
 }
 
 .landing__hero-content > * {
