@@ -10,6 +10,7 @@ import { useT } from "@/lib/i18n"
 import { buildObjectRoute, buildRoomRoute } from "@/lib/routes"
 
 type ContextPanelProps = {
+  apiObjects?: ObjectRecord[]
   panelConfig?: {
     leftPanel: boolean
     commandBar: boolean
@@ -25,10 +26,11 @@ type ContextPanelProps = {
   space: SpaceRecord
 }
 
-export function ContextPanel({ panelConfig, providers, selectedObject, selectedRoom, showReviewCounts, space }: ContextPanelProps) {
+export function ContextPanel({ apiObjects, panelConfig, providers, selectedObject, selectedRoom, showReviewCounts, space }: ContextPanelProps) {
   const { bridge, status, currentRoom: sdkRoom, sdkRooms } = useBridge()
   const t = useT()
   const [detectedObjects, setDetectedObjects] = useState<ObjectRecord[]>([])
+  const [selectedDetectedObject, setSelectedDetectedObject] = useState<ObjectRecord | null>(null)
 
   // Match SDK room to our data model for reactive room tracking
   const matchedRoom = sdkRoom
@@ -57,8 +59,23 @@ export function ContextPanel({ panelConfig, providers, selectedObject, selectedR
   const focalObject = selectedObject ?? space.objects.find((o) => o.roomId === focalRoom.id) ?? space.objects[0]
   const objectRoute = buildObjectRoute(space.id, focalObject.id)
 
-  // Fetch persisted AI-detected objects for the current room
+  // Reset selected detected object when room changes
+  useEffect(() => {
+    setSelectedDetectedObject(null)
+  }, [focalRoom.id])
+
+  // Derive detected objects: prefer parent-supplied apiObjects (already fetched),
+  // filtered to the current room. Fall back to a room-scoped fetch when not supplied.
   const fetchDetectedObjects = useCallback(async () => {
+    if (apiObjects !== undefined) {
+      const roomObjects = apiObjects.filter(
+        (o) =>
+          o.roomId === focalRoom.id ||
+          o.roomName?.toLowerCase() === focalRoom.name.toLowerCase()
+      )
+      setDetectedObjects(roomObjects)
+      return
+    }
     try {
       const params = new URLSearchParams({ spaceId: space.id })
       if (focalRoom.id) params.set("roomId", focalRoom.id)
@@ -70,7 +87,7 @@ export function ContextPanel({ panelConfig, providers, selectedObject, selectedR
     } catch {
       // Best-effort
     }
-  }, [space.id, focalRoom.id])
+  }, [apiObjects, space.id, focalRoom.id, focalRoom.name])
 
   useEffect(() => {
     void fetchDetectedObjects()
@@ -93,6 +110,13 @@ export function ContextPanel({ panelConfig, providers, selectedObject, selectedR
       }
     },
     [bridge, status]
+  )
+
+  const handleDetectedObjectClick = useCallback(
+    (obj: ObjectRecord) => {
+      setSelectedDetectedObject((prev) => (prev?.id === obj.id ? null : obj))
+    },
+    []
   )
 
   return (
@@ -167,6 +191,15 @@ export function ContextPanel({ panelConfig, providers, selectedObject, selectedR
         ) : null}
       </section>
 
+      {/* Inline workflow card for a detected object selected from the list */}
+      {selectedDetectedObject ? (
+        <ObjectWorkflowCard
+          objectRecord={selectedDetectedObject}
+          objectRoute={buildObjectRoute(space.id, selectedDetectedObject.id)}
+          spaceId={space.id}
+        />
+      ) : null}
+
       {/* AI-detected objects for current room */}
       {panelConfig?.aiDetections === true && detectedObjects.length > 0 ? (
         <section className="context-card">
@@ -177,27 +210,44 @@ export function ContextPanel({ panelConfig, providers, selectedObject, selectedR
             </div>
           </div>
           <ul className="context-list context-list--dense">
-            {detectedObjects.slice(0, 20).map((obj) => (
-              <li key={obj.id} className="context-detected-item">
-                <div className="context-detected-item__header">
-                  <strong>{obj.title}</strong>
-                  {obj.confidence != null ? (
-                    <span className="context-detected-item__confidence">
-                      {Math.round(obj.confidence * 100)}%
-                    </span>
+            {detectedObjects.slice(0, 20).map((obj) => {
+              const isSelected = selectedDetectedObject?.id === obj.id
+              return (
+                <li
+                  key={obj.id}
+                  className={`context-detected-item context-detected-item--clickable${isSelected ? " context-detected-item--selected" : ""}`}
+                  onClick={() => handleDetectedObjectClick(obj)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault()
+                      handleDetectedObjectClick(obj)
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={isSelected}
+                >
+                  <div className="context-detected-item__header">
+                    <strong>{obj.title}</strong>
+                    {obj.confidence != null ? (
+                      <span className="context-detected-item__confidence">
+                        {Math.round(obj.confidence * 100)}%
+                      </span>
+                    ) : null}
+                  </div>
+                  {obj.type ? <span className="context-detected-item__tag">{obj.type}{obj.category ? ` · ${obj.category}` : ""}</span> : obj.category ? <span className="context-detected-item__tag">{obj.category}</span> : null}
+                  {obj.description ? (
+                    <p className="context-detected-item__desc">{obj.description}</p>
                   ) : null}
-                </div>
-                {obj.category ? <span className="context-detected-item__tag">{obj.category}</span> : null}
-                {obj.description ? (
-                  <p className="context-detected-item__desc">{obj.description}</p>
-                ) : null}
-                <div className="context-detected-item__meta">
-                  {obj.condition && obj.condition !== "Unknown" ? <span>{obj.condition}</span> : null}
-                  {obj.material ? <span>{obj.material}</span> : null}
-                  <span>{obj.status}</span>
-                </div>
-              </li>
-            ))}
+                  <div className="context-detected-item__meta">
+                    {obj.disposition ? <span>{obj.disposition}</span> : null}
+                    {obj.condition && obj.condition !== "Unknown" ? <span>{obj.condition}</span> : null}
+                    {obj.material ? <span>{obj.material}</span> : null}
+                    <span>{obj.status}</span>
+                  </div>
+                </li>
+              )
+            })}
           </ul>
           {detectedObjects.length > 20 ? (
             <p className="text-xs text-muted-foreground mt-2">

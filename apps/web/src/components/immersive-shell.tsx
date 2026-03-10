@@ -380,6 +380,7 @@ function ImmersiveShellInner({
             transition={{ duration: isImmersive ? immersiveDur : dur, ease, delay: reduceMotion ? 0 : 0.12 }}
           >
             <ContextPanel
+              apiObjects={apiObjects}
               panelConfig={modeConfig.panels}
               providers={providers}
               selectedObject={selectedObject}

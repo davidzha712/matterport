@@ -29,6 +29,7 @@ export type ObjectRecord = {
   insuranceNotes?: string
   material?: string
   notes?: string
+  photos?: Array<{ id: string; url: string; createdAt: string }>
   position?: { x: number; y: number; z: number }
   provenance?: string
   roomId: string
@@ -39,6 +40,7 @@ export type ObjectRecord = {
   title: string
   type: string
   updatedAt?: string
+  voiceNotes?: Array<{ id: string; text: string; createdAt: string }>
 }
 
 export type RoomRecord = {

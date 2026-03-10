@@ -1373,6 +1373,82 @@ ul {
     radial-gradient(circle at top left, rgba(238, 208, 138, 0.18), transparent 20%),
     linear-gradient(145deg, rgba(16, 29, 39, 0.92), rgba(8, 13, 19, 0.92));
   color: var(--text-muted);
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.82rem;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.asset-strip__card:hover:not(:disabled) {
+  border-color: rgba(203, 176, 110, 0.3);
+  color: var(--text);
+}
+
+.asset-strip__card:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.asset-strip__card--recording {
+  border-color: rgba(216, 142, 142, 0.5);
+  background:
+    radial-gradient(circle at top left, rgba(216, 142, 142, 0.18), transparent 20%),
+    linear-gradient(145deg, rgba(16, 29, 39, 0.92), rgba(8, 13, 19, 0.92));
+}
+
+.asset-strip__recording-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--danger);
+}
+
+.asset-strip__rec-dot {
+  display: inline-block;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--danger);
+  animation: rec-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes rec-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.asset-thumbnails {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.asset-thumbnail {
+  width: 4rem;
+  height: 4rem;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.voice-note-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.25rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.voice-note-item {
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid rgba(203, 176, 110, 0.15);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
 }
 
 .action-matrix {
@@ -1530,6 +1606,29 @@ ul {
   gap: 0.5rem;
   font-size: 0.72rem;
   color: rgba(255, 255, 255, 0.4);
+}
+
+.context-detected-item--clickable {
+  cursor: pointer;
+  border-radius: 6px;
+  padding-inline: 0.4rem;
+  margin-inline: -0.4rem;
+  transition: background 0.15s ease;
+}
+
+.context-detected-item--clickable:hover,
+.context-detected-item--clickable:focus-visible {
+  background: rgba(203, 176, 110, 0.08);
+  outline: none;
+}
+
+.context-detected-item--selected {
+  background: rgba(203, 176, 110, 0.14);
+  border-color: rgba(203, 176, 110, 0.3);
+}
+
+.context-detected-item--selected .context-detected-item__header strong {
+  color: var(--accent-strong);
 }
 
 .stage-room-strip {
@@ -2897,21 +2996,21 @@ ul {
 /* Enter Immersive button */
 .immersive-enter-btn {
   position: absolute;
-  bottom: 80px;
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
   z-index: 30;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 20px;
+  padding: 0.8rem 2rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: rgba(8, 17, 26, 0.85);
   backdrop-filter: blur(12px);
   color: var(--accent);
   font-family: var(--font-sans);
-  font-size: 0.72rem;
+  font-size: 0.9rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -2919,10 +3018,25 @@ ul {
   transition: background 0.2s, border-color 0.2s, transform 0.15s;
 }
 
+.immersive-enter-btn::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  border: 1px solid var(--accent);
+  opacity: 0;
+  animation: immersive-pulse 3s ease-in-out infinite;
+}
+
+@keyframes immersive-pulse {
+  0%, 100% { opacity: 0; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.05); }
+}
+
 .immersive-enter-btn:hover {
   background: rgba(203, 176, 110, 0.12);
   border-color: var(--accent);
-  transform: translateX(-50%) translateY(-2px);
+  transform: translate(-50%, -50%) translateY(-2px);
 }
 
 .immersive-enter-btn__icon {
