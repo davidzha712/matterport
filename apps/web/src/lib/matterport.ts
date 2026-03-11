@@ -28,38 +28,45 @@ export function getMatterportEmbedStatus(space: SpaceRecord): EmbedStatus {
   }
 }
 
+const BASE_PARAMS: Record<string, string> = {
+  play: "1",
+  qs: "1",
+  brand: "0",
+  title: "0",
+  help: "0",
+  gt: "0",    // guided tour button hidden (we have our own)
+  hr: "0",    // highlight reel hidden
+  f: "0",     // fullscreen button hidden
+  mls: "2",   // mattertag label style: disc
+  mt: "1",    // mattertags (3D labels) enabled
+  dh: "1",    // dollhouse mode enabled (SDK controlled)
+  fp: "1",    // floorplan mode enabled (SDK controlled)
+  nozoom: "1",  // hide zoom controls
+  pin: "0",     // disable pin
+  portal: "0",  // disable portals
+  vr: "0",      // hide VR button
+  search: "0",  // hide search
+  gs: "0",      // hide getting started
+  views: "0",   // hide views panel
+  lp: "0",      // hide labeled pins UI
+  nt: "1",      // no title bar
+}
+
+/** Full SDK embed URL — includes applicationKey so the parent can connect via mpSdk */
 export function getMatterportEmbedUrl(modelSid: string): string {
   const sdkKey = process.env.NEXT_PUBLIC_MATTERPORT_SDK_KEY
-
-  const params: Record<string, string> = {
-    m: modelSid,
-    play: "1",
-    qs: "1",
-    brand: "0",
-    title: "0",
-    help: "0",
-    gt: "0",    // guided tour button hidden (we have our own)
-    hr: "0",    // highlight reel hidden
-    f: "0",     // fullscreen button hidden
-    mls: "2",   // mattertag label style: disc
-    mt: "1",    // mattertags (3D labels) enabled
-    dh: "1",    // dollhouse mode enabled (SDK controlled)
-    fp: "1",    // floorplan mode enabled (SDK controlled)
-    nozoom: "1",  // hide zoom controls
-    pin: "0",     // disable pin
-    portal: "0",  // disable portals
-    vr: "0",      // hide VR button
-    search: "0",  // hide search
-    gs: "0",      // hide getting started
-    views: "0",   // hide views panel
-    lp: "0",      // hide labeled pins UI
-    nt: "1",      // no title bar
-  }
+  const params: Record<string, string> = { m: modelSid, ...BASE_PARAMS }
 
   if (sdkKey) {
     params.applicationKey = sdkKey
   }
 
-  const search = new URLSearchParams(params)
-  return `https://my.matterport.com/show/?${search.toString()}`
+  return `https://my.matterport.com/show/?${new URLSearchParams(params).toString()}`
+}
+
+/** Preview-only embed URL — NO applicationKey so the viewer renders standalone
+ *  without waiting for an SDK connection from the parent page. */
+export function getMatterportPreviewUrl(modelSid: string): string {
+  const params: Record<string, string> = { m: modelSid, ...BASE_PARAMS }
+  return `https://my.matterport.com/show/?${new URLSearchParams(params).toString()}`
 }

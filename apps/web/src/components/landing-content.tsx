@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useT } from "@/lib/i18n"
 import { LocaleSwitcher } from "@/components/locale-switcher"
-import { getMatterportEmbedUrl } from "@/lib/matterport"
+import { getMatterportPreviewUrl } from "@/lib/matterport"
 import { buildSpaceRoute } from "@/lib/routes"
 import type { ProjectRecord } from "@/lib/platform-types"
 
@@ -24,7 +24,7 @@ export function LandingContent({ projects }: LandingContentProps) {
             allow="fullscreen; xr-spatial-tracking; accelerometer; gyroscope"
             className="landing__hero-embed"
             loading="eager"
-            src={getMatterportEmbedUrl(featuredSpace.matterportModelSid)}
+            src={getMatterportPreviewUrl(featuredSpace.matterportModelSid)}
             title={featuredSpace.name}
           />
         ) : (
@@ -80,7 +80,7 @@ export function LandingContent({ projects }: LandingContentProps) {
                       allow="fullscreen; xr-spatial-tracking; accelerometer; gyroscope"
                       className="space-card__embed"
                       loading="lazy"
-                      src={getMatterportEmbedUrl(space.matterportModelSid)}
+                      src={getMatterportPreviewUrl(space.matterportModelSid)}
                       title={space.name}
                     />
                   ) : (
