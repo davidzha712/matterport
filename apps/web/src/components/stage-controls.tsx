@@ -23,6 +23,7 @@ type AIDetectedItem = {
 }
 
 type AnnotationsBatchDetail = {
+  captureDataUrl?: string
   items: AIDetectedItem[]
   screenshotPose?: CameraPose | null
   spaceId?: string
@@ -32,6 +33,16 @@ type AnnotationsBatchDetail = {
 
 // Default screenshot resolution used by bridge.captureScreenshot()
 const SCREENSHOT_RES = { width: 1920, height: 1080 }
+
+/** Measure actual pixel dimensions of a data-URL image. */
+function measureImageDimensions(dataUrl: string): Promise<{ width: number; height: number } | null> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight })
+    img.onerror = () => resolve(null)
+    img.src = dataUrl
+  })
+}
 
 // Distance threshold for deduplication (meters)
 const DEDUP_DISTANCE_M = 0.5
@@ -207,138 +218,159 @@ export function StageControls({ spaceId, annotationMode }: StageControlsProps) {
       if (!detail?.items?.length) return
       if (processingRef.current) return
       processingRef.current = true
+      try {
+        const savedPose = detail.screenshotPose ?? null
+        const batchSpaceId = detail.spaceId ?? ""
+        const batchRoomId = detail.roomId || bridge.currentRoom?.id || ""
+        const batchRoomName = detail.roomName || bridge.currentRoom?.name || ""
+        let placed = 0
+        let projected = 0
+        let skippedDupes = 0
+        const objectsToSave: Array<Record<string, unknown>> = []
 
-      const savedPose = detail.screenshotPose ?? null
-      const batchSpaceId = detail.spaceId ?? ""
-      const batchRoomId = detail.roomId ?? ""
-      const batchRoomName = detail.roomName ?? ""
-      let placed = 0
-      let projected = 0
-      let skippedDupes = 0
-      const objectsToSave: Array<Record<string, unknown>> = []
-
-      for (const item of detail.items) {
-        if (!item.label) continue
-
-        let anchorPosition: { x: number; y: number; z: number } | null = null
-
-        // Try 2D→3D projection using saved camera pose from screenshot time
-        if (item.bbox && item.bbox.length === 4) {
-          anchorPosition = await bridge.bboxToWorldPosition(item.bbox, SCREENSHOT_RES, savedPose)
-          if (anchorPosition) projected++
+        // Detect actual image dimensions from the capture data URL so the
+        // bbox→NDC normalisation is correct even when the SDK fell back to
+        // 1280×720 or the user uploaded a photo at an arbitrary resolution.
+        let screenshotRes = SCREENSHOT_RES
+        if (detail.captureDataUrl) {
+          const measured = await measureImageDimensions(detail.captureDataUrl)
+          if (measured) screenshotRes = measured
         }
 
-        // Deduplication: skip if an existing annotation is within threshold distance
-        if (anchorPosition) {
-          const existing = bridge.getAnnotations()
-          const isDuplicate = existing.some(
-            (ann) => distance3d(ann.position, anchorPosition!) < DEDUP_DISTANCE_M
-          )
-          if (isDuplicate) {
-            skippedDupes++
-            continue
+        for (const item of detail.items) {
+          if (!item.label) continue
+
+          let anchorPosition: { x: number; y: number; z: number } | null = null
+
+          // Try 2D→3D projection using saved camera pose from screenshot time
+          if (item.bbox && item.bbox.length === 4) {
+            anchorPosition = await bridge.bboxToWorldPosition(item.bbox, screenshotRes, savedPose)
+            if (anchorPosition) projected++
           }
-        }
 
-        // Fallback: place at camera forward direction
-        let tagId: string | null = null
-        if (!anchorPosition) {
-          tagId = await bridge.addTagAtCurrentView(
-            item.label,
-            item.description ?? "",
-            item.color
-          )
-          anchorPosition = bridge.getCameraPose()?.position ?? { x: 0, y: 0, z: 0 }
-        } else {
-          // Have a projected position — create the 3D tag at the exact spot
-          tagId = await bridge.addTag({
-            label: item.label,
-            description: item.description ?? "",
-            anchorPosition,
-            stemVector: { x: 0, y: 0.2, z: 0 },
-            color: item.color,
-          })
-        }
-
-        // Add to local annotation overlay WITHOUT creating another SDK tag
-        bridge.addAnnotation(
-          {
-            label: item.label,
-            description: item.description ?? "",
-            position: anchorPosition,
-            createdBy: "ai",
-            confidence: item.confidence,
-            category: item.category,
-            roomId: batchRoomId,
-            roomName: batchRoomName,
-            spaceId: batchSpaceId,
-            tagId: tagId ?? undefined,
-          },
-          { skipTagSync: true, existingTagId: tagId ?? undefined }
-        )
-
-        // Collect for API persistence
-        objectsToSave.push({
-          title: item.label,
-          description: item.description ?? "",
-          type: item.category ?? "Unknown",
-          category: item.category,
-          confidence: item.confidence,
-          material: item.material,
-          era: item.era,
-          condition: item.condition,
-          estimatedValue: item.estimatedValue,
-          position: anchorPosition,
-          tagId,
-          spaceId: batchSpaceId,
-          roomId: batchRoomId,
-          roomName: batchRoomName,
-          createdBy: "ai",
-        })
-
-        placed++
-        setCaptureHint(`Placing: ${placed}/${detail.items.length}`)
-
-        // Small delay between tags to avoid API batching issues
-        await new Promise((r) => setTimeout(r, 120))
-      }
-
-      // Persist to API in batch and store API IDs back on annotations
-      if (objectsToSave.length > 0) {
-        try {
-          const res = await fetch("/api/objects", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ objects: objectsToSave }),
-          })
-          if (res.ok) {
-            const data = (await res.json()) as { created: Array<{ id: string; tagId?: string }> }
-            // Map API object IDs back to annotations via tagId matching
-            for (const saved of data.created) {
-              if (!saved.tagId) continue
-              const ann = bridge.getAnnotations().find((a) => a.tagId === saved.tagId)
-              if (ann) {
-                bridge.updateAnnotation(ann.id, { objectId: saved.id, savedToApi: true })
-              }
+          // Deduplication: skip if an existing annotation is within threshold distance
+          if (anchorPosition) {
+            const projectedPosition = anchorPosition
+            const existing = bridge.getAnnotations()
+            const isDuplicate = existing.some(
+              (ann) => distance3d(ann.position, projectedPosition) < DEDUP_DISTANCE_M
+            )
+            if (isDuplicate) {
+              skippedDupes++
+              continue
             }
           }
-        } catch {
-          // Persistence is best-effort — tags are already placed
+
+          // Fallback: place at camera forward direction
+          let tagId: string | null = null
+          if (!anchorPosition) {
+            tagId = await bridge.addTagAtCurrentView(
+              item.label,
+              item.description ?? "",
+              item.color
+            )
+            anchorPosition = bridge.getCameraPose()?.position ?? { x: 0, y: 0, z: 0 }
+          } else {
+            // Have a projected position — create the 3D tag at the exact spot
+            tagId = await bridge.addTag({
+              label: item.label,
+              description: item.description ?? "",
+              anchorPosition,
+              stemVector: { x: 0, y: 0.2, z: 0 },
+              color: item.color,
+            })
+          }
+
+          // Add to local annotation overlay WITHOUT creating another SDK tag
+          bridge.addAnnotation(
+            {
+              label: item.label,
+              description: item.description ?? "",
+              position: anchorPosition,
+              createdBy: "ai",
+              confidence: item.confidence,
+              category: item.category,
+              roomId: batchRoomId,
+              roomName: batchRoomName,
+              spaceId: batchSpaceId,
+              tagId: tagId ?? undefined,
+            },
+            { skipTagSync: true, existingTagId: tagId ?? undefined }
+          )
+
+          // Collect for API persistence
+          const createdAt = new Date().toISOString()
+          objectsToSave.push({
+            title: item.label,
+            description: item.description ?? "",
+            type: item.category ?? "Unknown",
+            category: item.category,
+            confidence: item.confidence,
+            material: item.material,
+            era: item.era,
+            condition: item.condition,
+            estimatedValue: item.estimatedValue,
+            position: anchorPosition,
+            tagId,
+            spaceId: batchSpaceId,
+            roomId: batchRoomId,
+            roomName: batchRoomName,
+            createdBy: "ai",
+            photos: detail.captureDataUrl
+              ? [
+                  {
+                    id: `photo_${crypto.randomUUID().slice(0, 8)}`,
+                    url: detail.captureDataUrl,
+                    createdAt,
+                  },
+                ]
+              : undefined,
+          })
+
+          placed++
+          setCaptureHint(`Placing: ${placed}/${detail.items.length}`)
+
+          // Small delay between tags to avoid API batching issues
+          await new Promise((r) => setTimeout(r, 120))
         }
-      }
 
-      if (placed > 0) {
-        const parts: string[] = []
-        parts.push(`${placed} objects annotated`)
-        if (projected > 0) parts.push(`${projected} projected to 3D`)
-        if (skippedDupes > 0) parts.push(`${skippedDupes} duplicates skipped`)
-        setCaptureHint(parts.join(" — "))
-        setTimeout(() => setCaptureHint(null), 5000)
-        // Notify other components that objects were saved
-        window.dispatchEvent(new CustomEvent("objects-updated"))
-      }
+        // Persist to API in batch and store API IDs back on annotations
+        if (objectsToSave.length > 0) {
+          try {
+            const res = await fetch("/api/objects", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ objects: objectsToSave }),
+            })
+            if (res.ok) {
+              const data = (await res.json()) as { created: Array<{ id: string; tagId?: string }> }
+              // Map API object IDs back to annotations via tagId matching
+              for (const saved of data.created) {
+                if (!saved.tagId) continue
+                const ann = bridge.getAnnotations().find((a) => a.tagId === saved.tagId)
+                if (ann) {
+                  bridge.updateAnnotation(ann.id, { objectId: saved.id, savedToApi: true })
+                }
+              }
+            }
+          } catch {
+            // Persistence is best-effort — tags are already placed
+          }
+        }
 
-      processingRef.current = false
+        if (placed > 0) {
+          const parts: string[] = []
+          parts.push(`${placed} objects annotated`)
+          if (projected > 0) parts.push(`${projected} projected to 3D`)
+          if (skippedDupes > 0) parts.push(`${skippedDupes} duplicates skipped`)
+          setCaptureHint(parts.join(" — "))
+          setTimeout(() => setCaptureHint(null), 5000)
+          // Notify other components that objects were saved
+          window.dispatchEvent(new CustomEvent("objects-updated"))
+        }
+      } finally {
+        processingRef.current = false
+      }
     }
 
     window.addEventListener("annotations-from-ai", handleBatch)

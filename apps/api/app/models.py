@@ -79,6 +79,21 @@ class WorkflowSummary(AliasedModel):
     reviewed_count: int = Field(alias="reviewedCount")
 
 
+WorkflowReadinessBlocker = Literal["no-objects", "pending-review", "no-approved"]
+
+
+class WorkflowReadiness(AliasedModel):
+    approved_count: int = Field(alias="approvedCount")
+    blockers: list[WorkflowReadinessBlocker]
+    export_ready: bool = Field(alias="exportReady")
+    listing_ready: bool = Field(alias="listingReady")
+    pending_review_count: int = Field(alias="pendingReviewCount")
+    reviewed_count: int = Field(alias="reviewedCount")
+    share_ready: bool = Field(alias="shareReady")
+    story_ready: bool = Field(alias="storyReady")
+    total_objects: int = Field(alias="totalObjects")
+
+
 class SpaceRecord(AliasedModel):
     id: str
     matterport_model_sid: str | None = Field(default=None, alias="matterportModelSid")
@@ -174,6 +189,10 @@ class ReviewQueueResponse(BaseModel):
 
 class AuditLogResponse(BaseModel):
     items: list[AuditEvent]
+
+
+class WorkflowReadinessResponse(AliasedModel):
+    readiness: WorkflowReadiness
 
 
 class RoomListResponse(BaseModel):

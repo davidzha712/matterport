@@ -36,10 +36,14 @@ def create_app() -> FastAPI:
         description="Backend scaffold for a reusable multi-project immersive platform.",
     )
 
-    allowed_origins = os.getenv(
-        "ALLOWED_ORIGINS",
-        "http://localhost:3000,http://127.0.0.1:3000",
-    ).split(",")
+    allowed_origins = [
+        origin.strip()
+        for origin in os.getenv(
+            "ALLOWED_ORIGINS",
+            "http://localhost:3100,http://127.0.0.1:3100,http://localhost:3000,http://127.0.0.1:3000",
+        ).split(",")
+        if origin.strip()
+    ]
 
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(

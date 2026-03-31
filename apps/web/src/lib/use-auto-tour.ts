@@ -22,6 +22,8 @@ export function useAutoTour(
   isTourActive: boolean
 ) {
   const [autoTourState, setAutoTourState] = useState<AutoTourState>("idle")
+  const autoTourStateRef = useRef<AutoTourState>(autoTourState)
+  autoTourStateRef.current = autoTourState
   const [tourSpeed, setTourSpeed] = useState<TourSpeed>("normal")
   const tourSpeedRef = useRef<TourSpeed>(tourSpeed)
   tourSpeedRef.current = tourSpeed
@@ -65,7 +67,7 @@ export function useAutoTour(
   // Custom stepped tour: advance to next snapshot with speed-controlled pause
   // Uses tourSpeedRef instead of tourSpeed closure to avoid stale-closure bug
   // in recursive setTimeout chains.
-  const advanceCustomTour = useCallback(async () => {
+  const advanceCustomTour = useCallback(async function advanceCustomTourImpl() {
     if (!customTourActiveRef.current) return
 
     const nextIndex = customTourIndexRef.current + 1
@@ -84,17 +86,47 @@ export function useAutoTour(
 
     // Schedule next step after speed-controlled pause (read current speed from ref)
     stepTimerRef.current = setTimeout(() => {
-      void advanceCustomTour()
+      void advanceCustomTourImpl()
     }, SPEED_PAUSE_MS[tourSpeedRef.current])
   }, [bridge])
 
   // Start a custom stepped tour (speed-controllable)
+  // Uses predefined tour snapshots when available, falls back to sweep navigation
+  // Begins from the tour stop nearest to the current camera position
   const startCustomTour = useCallback(async () => {
     const snapshots = await bridge.getTourSnapshots()
-    if (snapshots.length === 0) return
+    const sweeps = bridge.getSweepsForTour()
+    const totalStops = snapshots.length > 0 ? snapshots.length : sweeps.length
 
-    snapshotCountRef.current = snapshots.length
-    customTourIndexRef.current = -1
+    if (totalStops === 0) return
+
+    // Find the tour stop nearest to current camera position
+    let startIndex = 0
+    const pose = bridge.getCameraPose()
+    if (pose) {
+      const cam = pose.position
+      let bestDist = Infinity
+      const stops = snapshots.length > 0 ? snapshots : sweeps
+      for (let i = 0; i < stops.length; i++) {
+        // Sweeps have position directly; snapshots need sweep lookup by sid
+        const stop = stops[i]
+        const sweep = "position" in stop ? stop : sweeps.find((s) => s.sid === stop.sid)
+        if (!sweep || !("position" in sweep)) continue
+        const pos = sweep.position
+        const dx = pos.x - cam.x
+        const dy = pos.y - cam.y
+        const dz = pos.z - cam.z
+        const dist = dx * dx + dy * dy + dz * dz
+        if (dist < bestDist) {
+          bestDist = dist
+          startIndex = i
+        }
+      }
+    }
+
+    snapshotCountRef.current = totalStops
+    // Set to one before the nearest so advanceCustomTour steps to it first
+    customTourIndexRef.current = startIndex - 1
     customTourActiveRef.current = true
     setAutoTourState("touring")
 
@@ -178,11 +210,14 @@ export function useAutoTour(
 
     let lastMove = 0
     function onInteraction(e: Event) {
-      // Throttle mousemove to avoid excessive timer resets
+      // mousemove only resets idle countdown — it should NOT stop an active tour
       if (e.type === "mousemove") {
         const now = Date.now()
         if (now - lastMove < 2000) return
         lastMove = now
+        if (customTourActiveRef.current || autoTourStateRef.current === "touring") return
+        resetIdleTimer()
+        return
       }
       resetIdleTimer()
     }

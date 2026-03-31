@@ -85,23 +85,6 @@ export function useImmersiveMode(bridge: MatterportBridge) {
           setShowDialog((prev) => !prev)
           break
 
-        case "v":
-        case "V":
-          e.preventDefault()
-          // One-key vision analysis: screenshot → auto-submit to AI
-          void bridge.captureScreenshot().then((dataUrl) => {
-            if (dataUrl) {
-              const pose = bridge.screenshotPose
-              window.dispatchEvent(
-                new CustomEvent("matterport-screenshot", { detail: { dataUrl, pose } })
-              )
-              // Auto-submit after a short delay to let command-bar pick up the screenshot
-              setTimeout(() => {
-                window.dispatchEvent(new CustomEvent("auto-vision-analyze"))
-              }, 300)
-            }
-          })
-          break
       }
     }
 
@@ -111,32 +94,20 @@ export function useImmersiveMode(bridge: MatterportBridge) {
     }
   }, [bridge, isImmersive])
 
-  // Global V key handler — works outside immersive mode too
+  // When iframe captures focus, ESC won't reach the parent document.
+  // Periodically reclaim focus only while immersive so ESC / WASD work.
   useEffect(() => {
-    function handleGlobalKeyDown(e: KeyboardEvent) {
-      if (isImmersive) return // handled by immersive keydown above
-      const tag = (e.target as HTMLElement).tagName
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return
+    if (!isImmersive) return
 
-      if (e.key === "v" || e.key === "V") {
-        e.preventDefault()
-        void bridge.captureScreenshot().then((dataUrl) => {
-          if (dataUrl) {
-            const pose = bridge.screenshotPose
-            window.dispatchEvent(
-              new CustomEvent("matterport-screenshot", { detail: { dataUrl, pose } })
-            )
-            setTimeout(() => {
-              window.dispatchEvent(new CustomEvent("auto-vision-analyze"))
-            }, 300)
-          }
-        })
-      }
+    function handleBlur() {
+      // Iframe grabbed focus — re-grab after a tick so key events reach parent
+      const id = requestAnimationFrame(() => window.focus())
+      return () => cancelAnimationFrame(id)
     }
 
-    window.addEventListener("keydown", handleGlobalKeyDown)
-    return () => window.removeEventListener("keydown", handleGlobalKeyDown)
-  }, [bridge, isImmersive])
+    window.addEventListener("blur", handleBlur)
+    return () => window.removeEventListener("blur", handleBlur)
+  }, [isImmersive])
 
   return {
     isImmersive,

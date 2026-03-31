@@ -37,3 +37,51 @@ export function writeObjectStore(store: ObjectStore): void {
   }
   writeFileSync(STORE_PATH, JSON.stringify(data, null, 2), "utf-8")
 }
+
+export function mergeObjectsForSpace(
+  baseObjects: ObjectRecord[],
+  storedObjects: ObjectRecord[],
+  spaceId: string,
+): ObjectRecord[] {
+  const merged = new Map(
+    baseObjects.map((objectRecord) => [
+      objectRecord.id,
+      { ...objectRecord, spaceId: objectRecord.spaceId ?? spaceId },
+    ]),
+  )
+
+  for (const storedObject of storedObjects) {
+    if (storedObject.spaceId !== spaceId) continue
+
+    const existing = merged.get(storedObject.id)
+    merged.set(
+      storedObject.id,
+      existing
+        ? { ...existing, ...storedObject, spaceId }
+        : { ...storedObject, spaceId },
+    )
+  }
+
+  return [...merged.values()]
+}
+
+export function mergeObjectCollections(
+  baseObjects: ObjectRecord[],
+  persistedObjects: ObjectRecord[],
+): ObjectRecord[] {
+  const merged = new Map<string, ObjectRecord>()
+
+  for (const objectRecord of baseObjects) {
+    merged.set(objectRecord.id, objectRecord)
+  }
+
+  for (const persistedObject of persistedObjects) {
+    const existing = merged.get(persistedObject.id)
+    merged.set(
+      persistedObject.id,
+      existing ? { ...existing, ...persistedObject } : persistedObject,
+    )
+  }
+
+  return Array.from(merged.values())
+}

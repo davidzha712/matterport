@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { getBrowserApiBaseUrl } from "@/lib/browser-api"
 import { useT } from "@/lib/i18n"
 import type { ProviderProfile } from "@/lib/platform-types"
+import type { WorkflowReadiness } from "@/lib/workflow-readiness"
 import { toDisplayDisposition, toDisplayObjectStatus, toDisplayPriority } from "@/lib/presentation"
 
 type ReviewQueueItem = {
@@ -28,43 +29,45 @@ type AuditEvent = {
   note?: string | null
   objectTitle: string
   reviewer: string
+  timestamp: string
 }
 
 export function WorkflowSidebar({
   providers,
+  readiness,
   spaceId,
 }: {
   providers: ProviderProfile[]
+  readiness: WorkflowReadiness
   spaceId: string
 }) {
   const t = useT()
   const [reviewQueue, setReviewQueue] = useState<ReviewQueueItem[]>([])
   const [auditLog, setAuditLog] = useState<AuditEvent[]>([])
-  const [error, setError] = useState<string | null>(null)
+  const [queueError, setQueueError] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
-      try {
-        setError(null)
-        const [queueResponse, auditResponse] = await Promise.all([
-          fetch(`${getBrowserApiBaseUrl()}/workflows/review-queue?spaceId=${spaceId}`),
-          fetch(`${getBrowserApiBaseUrl()}/workflows/audit-log?spaceId=${spaceId}`),
-        ])
+      setQueueError(null)
 
-        if (!queueResponse.ok || !auditResponse.ok) {
-          throw new Error("Workflow-Daten konnten nicht geladen werden.")
-        }
+      const [queueResult, auditResult] = await Promise.allSettled([
+        fetch(`/api/workflows/review-queue?spaceId=${spaceId}`),
+        fetch(`${getBrowserApiBaseUrl()}/workflows/audit-log?spaceId=${spaceId}`),
+      ])
 
-        const queuePayload = (await queueResponse.json()) as { items: ReviewQueueItem[] }
-        const auditPayload = (await auditResponse.json()) as { items: AuditEvent[] }
+      if (queueResult.status === "fulfilled" && queueResult.value.ok) {
+        const queuePayload = (await queueResult.value.json()) as { items: ReviewQueueItem[] }
         setReviewQueue(queuePayload.items)
+      } else {
+        setReviewQueue([])
+        setQueueError("Workflow-Daten konnten nicht geladen werden.")
+      }
+
+      if (auditResult.status === "fulfilled" && auditResult.value.ok) {
+        const auditPayload = (await auditResult.value.json()) as { items: AuditEvent[] }
         setAuditLog(auditPayload.items)
-      } catch (caughtError) {
-        setError(
-          caughtError instanceof Error
-            ? caughtError.message
-            : "Workflow-Daten konnten nicht geladen werden."
-        )
+      } else {
+        setAuditLog([])
       }
     }
 
@@ -93,8 +96,8 @@ export function WorkflowSidebar({
           </div>
           <span className="pill pill--active">{reviewQueue.length} {t.workflowSidebar.open}</span>
         </div>
-        {error ? (
-          <p className="workflow-feedback workflow-feedback--error">{error}</p>
+        {queueError ? (
+          <p className="workflow-feedback workflow-feedback--error">{queueError}</p>
         ) : reviewQueue.length ? (
           <ul className="workflow-list">
             {reviewQueue.map((item) => (
@@ -139,6 +142,39 @@ export function WorkflowSidebar({
       <section className="context-card">
         <div className="section-heading">
           <div>
+            <p className="eyebrow">{t.workflowSidebar.releaseGate}</p>
+            <h2>{t.workflowSidebar.roomChecklist}</h2>
+          </div>
+        </div>
+        <ul className="context-list">
+          <li>
+            {readiness.exportReady ? t.workflowSidebar.exportReady : t.workflowSidebar.exportBlocked}
+          </li>
+          <li>
+            {readiness.publishReady ? t.workflowSidebar.publishReady : t.workflowSidebar.publishBlocked}
+          </li>
+          <li>
+            {readiness.shareReady ? t.workflowSidebar.shareReady : t.workflowSidebar.shareBlocked}
+          </li>
+        </ul>
+        <ul className="workflow-list workflow-list--audit">
+          {readiness.roomChecklist.map((room) => (
+            <li className="workflow-list__item" key={room.id}>
+              <div>
+                <strong>{room.name}</strong>
+                <p>{room.objectCount} {t.common.objects.toLowerCase()}</p>
+              </div>
+              <div className="workflow-list__meta">
+                <span>{room.ready ? t.contextPanel.roomReady : `${room.pendingReviewCount} ${t.contextPanel.roomPending}`}</span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="context-card">
+        <div className="section-heading">
+          <div>
             <p className="eyebrow">{t.workflowSidebar.auditTrail}</p>
             <h2>{t.workflowSidebar.recentChanges}</h2>
           </div>
@@ -156,7 +192,10 @@ export function WorkflowSidebar({
                     {toDisplayDisposition(event.before.disposition)} →{" "}
                     {toDisplayDisposition(event.after.disposition)}
                   </span>
-                  <small>{event.note || t.workflowSidebar.noAdditionalNote}</small>
+                  <small>
+                    {event.note || t.workflowSidebar.noAdditionalNote} · {t.workflowSidebar.updatedLabel}{" "}
+                    {new Date(event.timestamp).toLocaleString()}
+                  </small>
                 </div>
               </li>
             ))}

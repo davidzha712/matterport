@@ -36,6 +36,35 @@ def test_export_invalid_space_csv():
     assert response.status_code == 404
 
 
+def test_export_space_csv_strict_blocks_pending_review():
+    response = client.get("/api/v1/export/spaces/orchard-main-house/csv?strict=true")
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": "Space export blocked until all objects leave Needs Review"
+    }
+
+
+def test_export_space_csv_strict_allows_ready_space():
+    response = client.get("/api/v1/export/spaces/lantern-gallery/csv?strict=true")
+    assert response.status_code == 200
+    assert "lantern-gallery" in response.headers["content-disposition"]
+
+
+def test_export_space_iiif_manifest_requires_publication_ready():
+    blocked = client.get("/api/v1/export/spaces/orchard-main-house/iiif-manifest?strict=true")
+    assert blocked.status_code == 409
+    assert blocked.json() == {
+        "detail": "Space export blocked until all objects leave Needs Review"
+    }
+
+    ready = client.get("/api/v1/export/spaces/lantern-gallery/iiif-manifest?strict=true")
+    assert ready.status_code == 200
+    payload = ready.json()
+    assert payload["type"] == "Manifest"
+    assert payload["items"][0]["type"] == "Canvas"
+    assert payload["label"]["en"] == ["North Gallery"]
+
+
 def test_export_escapes_formula_like_cells():
     space = get_space("orchard-main-house")
     assert space is not None

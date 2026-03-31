@@ -7,7 +7,7 @@ import { useT } from "@/lib/i18n"
 import { GlassPanel } from "@/components/gallery"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 
@@ -203,7 +203,7 @@ export function AnnotationOverlay({
       setEditingId(null)
       setEditState(null)
     },
-    [annotations, editState, onUpdate]
+    [annotations, bridgeRef, editState, onUpdate]
   )
 
   const updateField = useCallback(
@@ -601,13 +601,4 @@ export function AnnotationOverlay({
       )}
     </GlassPanel>
   )
-}
-
-function formatValueRange(v?: { min?: number; max?: number; currency?: string }): string {
-  if (!v) return ""
-  const cur = v.currency ?? "EUR"
-  if (v.min != null && v.max != null) return `${cur} ${v.min.toLocaleString()}-${v.max.toLocaleString()}`
-  if (v.min != null) return `${cur} ${v.min.toLocaleString()}+`
-  if (v.max != null) return `up to ${cur} ${v.max.toLocaleString()}`
-  return ""
 }

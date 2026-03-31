@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { motion, useReducedMotion, AnimatePresence } from "framer-motion"
 import { AIProgressOverlay } from "@/components/ai-progress-overlay"
 import { ApprovalProgressBar } from "@/components/approval-progress-bar"
@@ -23,6 +23,7 @@ import type { ObjectRecord, ProviderProfile, RoomRecord, SpaceRecord } from "@/l
 import { buildSpaceRoute } from "@/lib/routes"
 import { stageModeLabels, type StageMode } from "@/lib/routes"
 import { getStageModeConfig } from "@/lib/stage-mode-config"
+import { getWorkflowReadiness } from "@/lib/workflow-readiness"
 
 type ImmersiveShellProps = {
   focusMode: StageMode
@@ -67,34 +68,60 @@ function ImmersiveShellInner({
   const [apiObjects, setApiObjects] = useState<ObjectRecord[]>([])
   const [apiObjectCount, setApiObjectCount] = useState<number | null>(null)
   const [roomTransitionName, setRoomTransitionName] = useState<string | null>(null)
+  const [shareState, setShareState] = useState<"idle" | "copied" | "error" | "blocked">("idle")
 
-  // V key → capture screenshot then auto-vision analysis in immersive mode
+  // Single V-key entrypoint for screenshot + auto-analysis.
+  // This stays here so mode capabilities gate the behavior in one place.
+  // Guard: visionBusyRef prevents re-triggering while analysis is in flight.
+  const visionBusyRef = useRef(false)
   const triggerVisionAnalysis = useCallback(async () => {
+    if (visionBusyRef.current) return
+    visionBusyRef.current = true
+
     const dataUrl = await bridge.captureScreenshot()
     if (dataUrl) {
       window.dispatchEvent(
-        new CustomEvent("matterport-screenshot", { detail: { dataUrl } })
+        new CustomEvent("matterport-screenshot", { detail: { dataUrl, pose: bridge.screenshotPose } })
       )
       // Wait for command-bar to process the screenshot attachment
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent("auto-vision-analyze"))
       }, 400)
+    } else {
+      // Screenshot failed — unlock immediately
+      visionBusyRef.current = false
     }
   }, [bridge])
 
+  // Reset busy flag when AI analysis finishes (progress becomes null)
   useEffect(() => {
-    if (!isImmersive || status !== "sdk-connected") return
+    function onProgress(event: Event) {
+      const detail = (event as CustomEvent<{ step: string; progress: number } | null>).detail
+      if (!detail) {
+        visionBusyRef.current = false
+      }
+    }
+    window.addEventListener("ai-analysis-progress", onProgress)
+    return () => window.removeEventListener("ai-analysis-progress", onProgress)
+  }, [])
+
+  useEffect(() => {
+    if (status !== "sdk-connected" || !modeConfig.toolbar.aiDetect || !modeConfig.panels.commandBar) {
+      return
+    }
 
     function handleKeyDown(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return
       if (e.key === "v" || e.key === "V") {
         e.preventDefault()
-        triggerVisionAnalysis()
+        void triggerVisionAnalysis()
       }
     }
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [isImmersive, status, triggerVisionAnalysis])
+  }, [modeConfig.panels.commandBar, modeConfig.toolbar.aiDetect, status, triggerVisionAnalysis])
 
   // Fetch model details from SDK once connected
   useEffect(() => {
@@ -134,13 +161,56 @@ function ImmersiveShellInner({
     return () => window.removeEventListener("objects-updated", onUpdated)
   }, [space.id])
 
+  // One-time sync of SDK rooms to CRM backend when they first load
+  const hasSyncedRoomsRef = useRef(false)
+  useEffect(() => {
+    if (sdkRooms.length === 0 || hasSyncedRoomsRef.current) return
+    hasSyncedRoomsRef.current = true
+
+    void fetch("/api/rooms", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        spaceId: space.id,
+        rooms: sdkRooms.map((r) => ({ id: r.id, name: r.name, bounds: r.bounds })),
+      }),
+    }).catch(() => {})
+  }, [sdkRooms, space.id])
+
   // Explore mode — room transition chip
   useEffect(() => {
-    if (focusMode !== "explore" || !sdkRoom?.name) return
-    setRoomTransitionName(sdkRoom.name)
-    const timer = setTimeout(() => setRoomTransitionName(null), 3000)
+    if (focusMode !== "explore") return
+
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const unsubscribe = bridge.onRoomChange((room) => {
+      if (!room?.name) return
+
+      setRoomTransitionName(room.name)
+      if (timer) {
+        clearTimeout(timer)
+      }
+      timer = setTimeout(() => {
+        setRoomTransitionName(null)
+      }, 3000)
+    })
+
+    return () => {
+      if (timer) {
+        clearTimeout(timer)
+      }
+      unsubscribe()
+    }
+  }, [bridge, focusMode])
+
+  useEffect(() => {
+    if (shareState === "idle") return
+
+    const timer = setTimeout(() => {
+      setShareState("idle")
+    }, 2200)
+
     return () => clearTimeout(timer)
-  }, [focusMode, sdkRoom?.name])
+  }, [shareState])
 
   // Compute room dimensions from SDK bounds (meters)
   const roomDimensions = sdkRoom?.bounds
@@ -177,7 +247,7 @@ function ImmersiveShellInner({
       )
     : undefined
 
-  const focalRoom = selectedRoom ?? matchedRoom ?? runtimeRooms[0]
+  const focalRoom = matchedRoom ?? selectedRoom ?? runtimeRooms[0]
 
   // Match objects by room — only show API-detected objects or CMS objects
   // that actually belong to this room (no mock fallback to unrelated objects)
@@ -188,11 +258,24 @@ function ImmersiveShellInner({
     ? space.objects.filter((o) => o.roomId === focalRoom?.id)
     : []
   const roomObjects = apiRoomObjects.length > 0 ? apiRoomObjects : dataRoomObjects
-  const focalObject = selectedObject ?? roomObjects[0] ?? apiObjects[0]
+  const focalObject = selectedObject ?? roomObjects[0]
+  const workflowReadiness = useMemo(
+    () => getWorkflowReadiness(space, apiObjects.length > 0 ? apiObjects : undefined),
+    [apiObjects, space],
+  )
+  const displayViewMode = currentSweep ? "inside" : currentMode
 
   const dur = reduceMotion ? 0 : 0.4
   const ease = [0.22, 1, 0.36, 1] as const
   const immersiveDur = reduceMotion ? 0 : 0.6
+  const shareAnnouncement =
+    shareState === "copied"
+      ? t.listingPrep.copied
+      : shareState === "blocked"
+        ? t.listingPrep.shareRequiresApproval
+      : shareState === "error"
+        ? t.listingPrep.copyFailed
+        : ""
 
   // Chrome animation targets — slide out when immersive, slide in when normal
   const topbarAnimate = isImmersive
@@ -214,7 +297,11 @@ function ImmersiveShellInner({
       data-stage-mode={focusMode}
       id="main-content"
     >
-      <MatterportStage space={space}>
+      <MatterportStage
+        allowAnnotationMode={modeConfig.annotations === "read-write"}
+        allowObjectDetection={modeConfig.panels.commandBar && modeConfig.toolbar.aiDetect}
+        space={space}
+      >
         {/* Work mode — status bar */}
         {focusMode === "work" ? (
           <div className="work-status-bar" aria-label={t.stage.mode + ": " + stageModeLabels[focusMode]}>
@@ -262,8 +349,8 @@ function ImmersiveShellInner({
           </div>
           {modeConfig.showApprovalProgress ? (
             <ApprovalProgressBar
-              reviewed={space.workflow?.reviewedCount ?? runtimeRooms.filter(r => r.pendingReviewCount === 0).length}
-              total={runtimeRooms.length}
+              reviewed={workflowReadiness.readyCount}
+              total={workflowReadiness.totalObjects}
             />
           ) : null}
           {modeConfig.showGlobalNav ? (
@@ -294,13 +381,36 @@ function ImmersiveShellInner({
               {modeConfig.showShareButton ? (
                 <button
                   className="listing-share-btn"
-                  onClick={() => { void navigator.clipboard.writeText(window.location.href) }}
+                  disabled={!workflowReadiness.shareReady}
+                  onClick={() => {
+                    void (async () => {
+                      if (!workflowReadiness.shareReady) {
+                        setShareState("blocked")
+                        return
+                      }
+
+                      try {
+                        if (!navigator.clipboard?.writeText) {
+                          throw new Error("clipboard unavailable")
+                        }
+                        await navigator.clipboard.writeText(window.location.href)
+                        setShareState("copied")
+                      } catch {
+                        setShareState("error")
+                      }
+                    })()
+                  }}
                   type="button"
                 >
-                  {t.listingPrep.share}
+                  {shareState === "copied" ? t.listingPrep.copied : t.listingPrep.share}
                 </button>
               ) : null}
               <LocaleSwitcher />
+              {modeConfig.showShareButton ? (
+                <span aria-live="polite" className="sr-only">
+                  {shareAnnouncement}
+                </span>
+              ) : null}
             </div>
           )}
         </motion.header>
@@ -337,7 +447,9 @@ function ImmersiveShellInner({
                       <div className="listing-highlights__label">{t.common.objects}</div>
                     </div>
                   </div>
-                  <div className="stage-intro-card__sell-badge">{t.listingPrep.badge}</div>
+                  <div className="stage-intro-card__sell-badge">
+                    {workflowReadiness.shareReady ? t.listingPrep.readyToShare : t.listingPrep.reviewRequired}
+                  </div>
                 </>
               ) : (
                 <p>{bridge.modelDetails?.summary ?? bridge.modelDetails?.description ?? space.summary}</p>
@@ -346,7 +458,7 @@ function ImmersiveShellInner({
                 <li>{runtimeRooms.length} {t.stage.roomsCaptured}</li>
                 <li>{status === "sdk-connected" ? (apiObjectCount ?? 0) : (apiObjectCount ?? space.objects.length)} {t.stage.objectsTracked}</li>
                 {modeConfig.showReviewCounts ? (
-                  <li>{runtimeRooms.reduce((sum, r) => sum + r.pendingReviewCount, 0)} {t.workflow.needsReview}</li>
+                  <li>{workflowReadiness.pendingReviewCount} {t.workflow.needsReview}</li>
                 ) : null}
               </ul>
               {modeConfig.introCardVariant !== "compact" ? (
@@ -392,18 +504,21 @@ function ImmersiveShellInner({
         ) : null}
 
         <StageControls annotationMode={modeConfig.annotations} spaceId={space.id} />
-        <StageToolbar
-          bridge={bridge}
-          currentRoom={sdkRoom}
-          measureActive={measureActive}
-          onMeasureToggle={() => setMeasureActive((v) => !v)}
-          tourSpeed={tourSpeed}
-          onTourSpeedChange={setTourSpeed}
-          onTourStart={startAutoTour}
-          onTourStop={stopAutoTour}
-          isTourPlaying={autoTourState === "touring"}
-          toolbarConfig={modeConfig.toolbar}
-        />
+        {isImmersive && (
+          <StageToolbar
+            bridge={bridge}
+            currentRoom={sdkRoom}
+            currentViewMode={displayViewMode}
+            measureActive={measureActive}
+            onMeasureToggle={() => setMeasureActive((v) => !v)}
+            tourSpeed={tourSpeed}
+            onTourSpeedChange={setTourSpeed}
+            onTourStart={startAutoTour}
+            onTourStop={stopAutoTour}
+            isTourPlaying={autoTourState === "touring"}
+            toolbarConfig={modeConfig.toolbar}
+          />
+        )}
         {modeConfig.toolbar.measure ? (
           <MeasureTool active={measureActive} onClose={() => setMeasureActive(false)} />
         ) : null}
@@ -515,7 +630,7 @@ function ImmersiveShellInner({
                     {status === "sdk-connected" ? "SDK" : "Iframe"}
                   </span>
                   <span className="immersive-hud__mode-badge">
-                    {currentMode}
+                    {t.viewModes[displayViewMode]}
                   </span>
                   {isTourActive ? (
                     <span className="immersive-hud__tour-badge">

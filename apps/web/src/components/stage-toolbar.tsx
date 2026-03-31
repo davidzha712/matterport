@@ -8,6 +8,7 @@ import type { TourSpeed } from "@/lib/use-auto-tour"
 type StageToolbarProps = {
   bridge: MatterportBridge
   currentRoom?: RoomData
+  currentViewMode?: ViewMode
   measureActive?: boolean
   onMeasureToggle?: () => void
   tourSpeed?: TourSpeed
@@ -26,13 +27,19 @@ type StageToolbarProps = {
 
 type TourState = "idle" | "playing" | "paused"
 
-export function StageToolbar({ bridge, currentRoom, measureActive, onMeasureToggle, tourSpeed, onTourSpeedChange, onTourStart, onTourStop, isTourPlaying, toolbarConfig }: StageToolbarProps) {
+export function StageToolbar({ bridge, currentRoom, currentViewMode, measureActive, onMeasureToggle, tourSpeed, onTourSpeedChange, onTourStart, onTourStop, isTourPlaying, toolbarConfig }: StageToolbarProps) {
   const t = useT()
   const [currentMode, setCurrentMode] = useState<ViewMode>("inside")
-  const [tourState, setTourState] = useState<TourState>("idle")
+  const [internalTourState, setInternalTourState] = useState<TourState>("idle")
   const [sdkReady, setSdkReady] = useState(bridge.status === "sdk-connected")
   const [showDimensions, setShowDimensions] = useState(false)
   const [analysisStatus, setAnalysisStatus] = useState<string | null>(null)
+  const tourState = isTourPlaying === undefined
+    ? internalTourState
+    : isTourPlaying
+      ? "playing"
+      : "idle"
+  const visibleMode = currentViewMode ?? currentMode
 
   const viewModeLabels: Record<ViewMode, string> = {
     inside: t.viewModes.inside,
@@ -55,7 +62,7 @@ export function StageToolbar({ bridge, currentRoom, measureActive, onMeasureTogg
     })
 
     const unsubTour = bridge.onTourStateChange((active) => {
-      setTourState(active ? "playing" : "idle")
+      setInternalTourState(active ? "playing" : "idle")
     })
 
     const checkReady = setInterval(() => {
@@ -72,13 +79,6 @@ export function StageToolbar({ bridge, currentRoom, measureActive, onMeasureTogg
     }
   }, [bridge])
 
-  // Sync with external tour state (from useAutoTour)
-  useEffect(() => {
-    if (isTourPlaying !== undefined) {
-      setTourState(isTourPlaying ? "playing" : "idle")
-    }
-  }, [isTourPlaying])
-
   const handleModeSwitch = useCallback(
     (mode: ViewMode) => {
       void bridge.setViewMode(mode)
@@ -93,16 +93,20 @@ export function StageToolbar({ bridge, currentRoom, measureActive, onMeasureTogg
       } else {
         void bridge.stopTour()
       }
-      setTourState("idle")
+      if (isTourPlaying === undefined) {
+        setInternalTourState("idle")
+      }
     } else {
       if (onTourStart) {
         onTourStart()
       } else {
         void bridge.startTour()
       }
-      setTourState("playing")
+      if (isTourPlaying === undefined) {
+        setInternalTourState("playing")
+      }
     }
-  }, [bridge, onTourStart, onTourStop, tourState])
+  }, [bridge, isTourPlaying, onTourStart, onTourStop, tourState])
 
   const handleTourNext = useCallback(() => {
     void bridge.nextTourStep()
@@ -116,7 +120,7 @@ export function StageToolbar({ bridge, currentRoom, measureActive, onMeasureTogg
     const dataUrl = await bridge.captureScreenshot()
     if (dataUrl) {
       window.dispatchEvent(
-        new CustomEvent("matterport-screenshot", { detail: { dataUrl } })
+        new CustomEvent("matterport-screenshot", { detail: { dataUrl, pose: bridge.screenshotPose } })
       )
     }
   }, [bridge])
@@ -126,7 +130,7 @@ export function StageToolbar({ bridge, currentRoom, measureActive, onMeasureTogg
     const dataUrl = await bridge.captureScreenshot()
     if (dataUrl) {
       window.dispatchEvent(
-        new CustomEvent("matterport-screenshot", { detail: { dataUrl } })
+        new CustomEvent("matterport-screenshot", { detail: { dataUrl, pose: bridge.screenshotPose } })
       )
       // Auto-submit after command-bar picks up the screenshot
       setTimeout(() => {
@@ -146,7 +150,7 @@ export function StageToolbar({ bridge, currentRoom, measureActive, onMeasureTogg
             {(Object.keys(viewModeLabels) as ViewMode[]).map((mode) => (
               <button
                 key={mode}
-                className={`stage-toolbar__btn${currentMode === mode ? " stage-toolbar__btn--active" : ""}`}
+                className={`stage-toolbar__btn${visibleMode === mode ? " stage-toolbar__btn--active" : ""}`}
                 disabled={!sdkReady}
                 onClick={() => handleModeSwitch(mode)}
                 type="button"

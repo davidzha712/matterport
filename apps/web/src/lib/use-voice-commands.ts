@@ -94,7 +94,7 @@ export function useVoiceCommands(
         const dataUrl = await bridge.captureScreenshot()
         if (dataUrl) {
           window.dispatchEvent(
-            new CustomEvent("matterport-screenshot", { detail: { dataUrl } })
+            new CustomEvent("matterport-screenshot", { detail: { dataUrl, pose: bridge.screenshotPose } })
           )
           return { handled: true, feedback: "Screenshot captured" }
         }

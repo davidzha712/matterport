@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import {
   MatterportBridge,
   type BridgeStatus,
@@ -32,6 +32,10 @@ export function BridgeProvider({ children }: { children: ReactNode }) {
   const [isTourActive, setIsTourActive] = useState(bridge.isTourActive)
   const [sdkRooms, setSdkRooms] = useState<ReadonlyArray<RoomData>>(bridge.rooms)
 
+  // Stable refs to avoid stale closure in polling interval
+  const prevStatusRef = useRef(bridge.status)
+  const prevRoomKeyRef = useRef("")
+
   useEffect(() => {
     const unsubRoom = bridge.onRoomChange((room) => {
       setCurrentRoom(room ? { ...room } : undefined)
@@ -50,11 +54,16 @@ export function BridgeProvider({ children }: { children: ReactNode }) {
     })
 
     const interval = setInterval(() => {
-      if (bridge.status !== status) {
+      // Status sync
+      if (bridge.status !== prevStatusRef.current) {
+        prevStatusRef.current = bridge.status
         setStatus(bridge.status)
       }
-      // Sync SDK rooms when they become available
-      if (bridge.rooms.length !== sdkRooms.length) {
+
+      // SDK rooms: deep compare by room IDs so content changes are detected
+      const newKey = bridge.rooms.map((r) => r.id).join("|")
+      if (newKey !== prevRoomKeyRef.current) {
+        prevRoomKeyRef.current = newKey
         setSdkRooms([...bridge.rooms])
       }
     }, 300)
@@ -67,7 +76,7 @@ export function BridgeProvider({ children }: { children: ReactNode }) {
       unsubTour()
       clearInterval(interval)
     }
-  }, [bridge, sdkRooms.length, status])
+  }, [bridge])
 
   const value = useMemo(
     () => ({

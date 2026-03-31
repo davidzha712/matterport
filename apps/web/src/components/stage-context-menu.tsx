@@ -10,6 +10,8 @@ type MenuPosition = { x: number; y: number }
 type MenuView = "actions" | "add-marker"
 
 type StageContextMenuProps = {
+  allowMarkerCreation?: boolean
+  allowObjectDetection?: boolean
   spaceId: string
   roomName?: string
   annotationMode: boolean
@@ -27,12 +29,14 @@ function distanceSq(
 }
 
 export function StageContextMenu({
+  allowMarkerCreation = true,
+  allowObjectDetection = true,
   spaceId,
   roomName,
   annotationMode,
   onExitAnnotationMode,
 }: StageContextMenuProps) {
-  const { bridge, status } = useBridge()
+  const { bridge, status, currentRoom } = useBridge()
   const t = useT()
 
   const [menuPos, setMenuPos] = useState<MenuPosition | null>(null)
@@ -40,6 +44,7 @@ export function StageContextMenu({
   const [label, setLabel] = useState("")
   const [description, setDescription] = useState("")
   const [feedback, setFeedback] = useState<string | null>(null)
+  const [menuIntersection, setMenuIntersection] = useState<PointerIntersection | null>(null)
 
   const lastIntersectionRef = useRef<PointerIntersection | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
@@ -82,6 +87,15 @@ export function StageContextMenu({
         : clientY
 
     setMenuPos({ x: Math.max(margin, x), y: Math.max(margin, y) })
+    setMenuIntersection(
+      lastIntersectionRef.current
+        ? {
+            ...lastIntersectionRef.current,
+            normal: { ...lastIntersectionRef.current.normal },
+            position: { ...lastIntersectionRef.current.position },
+          }
+        : null
+    )
     setView("actions")
     setLabel("")
     setDescription("")
@@ -181,6 +195,7 @@ export function StageContextMenu({
 
   const closeMenu = useCallback(() => {
     setMenuPos(null)
+    setMenuIntersection(null)
   }, [])
 
   const handleAddMarker = useCallback(() => {
@@ -190,12 +205,15 @@ export function StageContextMenu({
   const sdkConnected = status === "sdk-connected"
 
   const handleSaveMarker = useCallback(async () => {
-    const intersection = lastIntersectionRef.current
+    const intersection = menuIntersection
     if (!intersection || !label.trim() || !sdkConnected) return
 
     const position = { ...intersection.position }
+    const resolvedRoomId = currentRoom?.id ?? ""
+    const resolvedRoomName = roomName ?? currentRoom?.name ?? ""
 
-    await bridge.addTag({
+    // Create 3D tag and capture its SDK ID
+    const tagId = await bridge.addTag({
       label: label.trim(),
       description: description.trim(),
       anchorPosition: position,
@@ -203,6 +221,39 @@ export function StageContextMenu({
       color: { r: 0.8, g: 0.69, b: 0.43 },
     })
 
+    // Persist to API so the marker survives page reload
+    let objectId: string | undefined
+    try {
+      const res = await fetch("/api/objects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          object: {
+            title: label.trim(),
+            description: description.trim(),
+            aiSummary: description.trim(),
+            position,
+            spaceId,
+            roomId: resolvedRoomId,
+            roomName: resolvedRoomName,
+            tagId: tagId ?? undefined,
+            createdBy: "manual",
+            status: "Needs Review",
+            disposition: "Keep",
+            type: "Manual Marker",
+          },
+        }),
+      })
+      if (res.ok) {
+        const data = (await res.json()) as { created: Array<{ id: string }> }
+        objectId = data.created?.[0]?.id
+        window.dispatchEvent(new CustomEvent("objects-updated"))
+      }
+    } catch {
+      // Best-effort — the 3D tag is already placed
+    }
+
+    // Register annotation in bridge, linking it to the SDK tag
     bridge.addAnnotation(
       {
         label: label.trim(),
@@ -210,9 +261,13 @@ export function StageContextMenu({
         position,
         createdBy: "manual",
         spaceId,
-        roomName,
+        roomId: resolvedRoomId,
+        roomName: resolvedRoomName,
+        tagId: tagId ?? undefined,
+        objectId,
+        savedToApi: objectId !== undefined,
       },
-      { skipTagSync: true }
+      { skipTagSync: true, existingTagId: tagId ?? undefined }
     )
 
     setFeedback("\u2713")
@@ -220,16 +275,17 @@ export function StageContextMenu({
       closeMenu()
       onExitAnnotationMode()
     }, 600)
-  }, [bridge, label, description, spaceId, roomName, closeMenu, sdkConnected, onExitAnnotationMode])
+  }, [bridge, closeMenu, currentRoom, description, label, menuIntersection, onExitAnnotationMode, roomName, sdkConnected, spaceId])
 
   const handleDetectObjects = useCallback(() => {
+    if (!allowObjectDetection) return
     window.dispatchEvent(new CustomEvent("auto-vision-analyze"))
     closeMenu()
     onExitAnnotationMode()
-  }, [closeMenu, onExitAnnotationMode])
+  }, [allowObjectDetection, closeMenu, onExitAnnotationMode])
 
   const handleNavigateHere = useCallback(async () => {
-    const intersection = lastIntersectionRef.current
+    const intersection = menuIntersection
     if (!intersection || !sdkConnected) return
 
     const targetPos = intersection.position
@@ -258,11 +314,11 @@ export function StageContextMenu({
 
     closeMenu()
     onExitAnnotationMode()
-  }, [bridge, closeMenu, sdkConnected, onExitAnnotationMode])
+  }, [bridge, closeMenu, menuIntersection, onExitAnnotationMode, sdkConnected])
 
   if (!menuPos) return null
 
-  const intersection = lastIntersectionRef.current
+  const intersection = menuIntersection
   const hasIntersection = intersection !== null && sdkConnected
 
   return (
@@ -277,7 +333,7 @@ export function StageContextMenu({
           <button
             className="stage-context-menu__item"
             onClick={handleAddMarker}
-            disabled={!hasIntersection}
+            disabled={!allowMarkerCreation || !hasIntersection}
             role="menuitem"
           >
             <span aria-hidden="true">{"\uD83D\uDCCC"}</span>
@@ -286,6 +342,7 @@ export function StageContextMenu({
           <button
             className="stage-context-menu__item"
             onClick={handleDetectObjects}
+            disabled={!allowObjectDetection}
             role="menuitem"
           >
             <span aria-hidden="true">{"\uD83D\uDD0D"}</span>
@@ -350,7 +407,7 @@ export function StageContextMenu({
                 <button
                   className="stage-context-menu__form-btn stage-context-menu__form-btn--primary"
                   onClick={handleSaveMarker}
-                  disabled={!label.trim() || !hasIntersection}
+                  disabled={!allowMarkerCreation || !label.trim() || !hasIntersection}
                   type="button"
                 >
                   {t.contextMenu.place}

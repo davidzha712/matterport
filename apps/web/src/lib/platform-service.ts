@@ -10,15 +10,11 @@ import type {
 } from "@/lib/platform-types"
 import {
   getProjects as getMockProjects,
-  getProviderProfiles as getMockProviders,
-  getReviewQueue as getMockReviewQueue,
-  getSpaceById as getMockSpace,
 } from "@/lib/mock-data"
+import { mergeObjectCollections, readObjectStore } from "@/lib/object-store"
 import { isSanityConfigured, sanityClient } from "@/lib/sanity/client"
 import {
   mapSnapshotToProjects,
-  mapSnapshotToReviewQueue,
-  mapSnapshotToSpace,
   type SanitySnapshot,
 } from "@/lib/sanity/mappers"
 import { controlRoomSnapshotQuery } from "@/lib/sanity/queries"
@@ -37,22 +33,99 @@ const getSanitySnapshot = cache(async (): Promise<SanitySnapshot | null> => {
   }
 })
 
+function buildWorkflowSummary(objects: ObjectRecord[]): SpaceRecord["workflow"] {
+  return {
+    approvedCount: objects.filter((objectRecord) => objectRecord.status === "Approved").length,
+    pendingReviewCount: objects.filter((objectRecord) => objectRecord.status === "Needs Review").length,
+    reviewedCount: objects.filter((objectRecord) => objectRecord.status === "Reviewed").length,
+  }
+}
+
+function hydrateSpaceWithLocalObjects(space: SpaceRecord, persistedObjects: ObjectRecord[]): SpaceRecord {
+  const spaceObjects = persistedObjects.filter((objectRecord) => objectRecord.spaceId === space.id)
+  const objects = mergeObjectCollections(space.objects, spaceObjects)
+  const rooms = space.rooms.map((room) => {
+    const roomObjects = objects.filter(
+      (objectRecord) =>
+        objectRecord.roomId === room.id ||
+        objectRecord.roomName?.toLowerCase() === room.name.toLowerCase()
+    )
+
+    return {
+      ...room,
+      objectIds: roomObjects.map((objectRecord) => objectRecord.id),
+      pendingReviewCount: roomObjects.filter((objectRecord) => objectRecord.status === "Needs Review").length,
+    }
+  })
+
+  return {
+    ...space,
+    objects,
+    rooms,
+    workflow: buildWorkflowSummary(objects),
+  }
+}
+
+function hydrateProjectsWithLocalObjects(projects: ProjectRecord[]): ProjectRecord[] {
+  const persistedObjects = readObjectStore().objects
+
+  return projects.map((project) => ({
+    ...project,
+    spaces: project.spaces.map((space) => hydrateSpaceWithLocalObjects(space, persistedObjects)),
+  }))
+}
+
+function buildReviewQueueFromProjects(projects: ProjectRecord[]): ReviewQueueItem[] {
+  return projects.flatMap((project) =>
+    project.spaces.flatMap((space) => {
+      const roomLookup = new Map(space.rooms.map((room) => [room.id, room]))
+
+      return space.objects
+        .filter((objectRecord) => objectRecord.status === "Needs Review")
+        .map((objectRecord) => {
+          const room = roomLookup.get(objectRecord.roomId)
+
+          return {
+            disposition: objectRecord.disposition,
+            objectId: objectRecord.id,
+            objectTitle: objectRecord.title,
+            priorityBand: room?.priorityBand ?? "Medium",
+            projectId: project.id,
+            projectName: project.name,
+            roomId: objectRecord.roomId,
+            roomName: objectRecord.roomName,
+            spaceId: space.id,
+            spaceName: space.name,
+            status: objectRecord.status,
+          }
+        })
+    }),
+  )
+}
+
 export async function getRuntimeProjects(): Promise<ProjectRecord[]> {
   const snapshot = await getSanitySnapshot()
   const projects = snapshot ? mapSnapshotToProjects(snapshot) : []
-  return projects.length > 0 ? projects : getMockProjects()
+  const runtimeProjects = projects.length > 0 ? projects : getMockProjects()
+  return hydrateProjectsWithLocalObjects(runtimeProjects)
 }
 
 export async function getRuntimeSpace(spaceId: string): Promise<SpaceRecord | undefined> {
-  const snapshot = await getSanitySnapshot()
-  const space = snapshot ? mapSnapshotToSpace(snapshot, spaceId) : undefined
-  return space ?? getMockSpace(spaceId)
+  const projects = await getRuntimeProjects()
+
+  for (const project of projects) {
+    const space = project.spaces.find((candidate) => candidate.id === spaceId)
+    if (space) {
+      return space
+    }
+  }
+
+  return undefined
 }
 
 export async function getRuntimeReviewQueue(): Promise<ReviewQueueItem[]> {
-  const snapshot = await getSanitySnapshot()
-  const queue = snapshot ? mapSnapshotToReviewQueue(snapshot) : []
-  return queue.length > 0 ? queue : getMockReviewQueue()
+  const projects = await getRuntimeProjects()
+  return buildReviewQueueFromProjects(projects)
 }
 
 export async function getRuntimeObject(spaceId: string, objectId: string): Promise<{

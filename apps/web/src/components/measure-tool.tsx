@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useBridge } from "@/lib/bridge-context"
 import { useT } from "@/lib/i18n"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 
 type MeasurePoint = {
@@ -110,11 +109,6 @@ export function MeasureTool({ active, onClose }: MeasureToolProps) {
   }, [onClose])
 
   if (!active) return null
-
-  const liveDistance =
-    pointA && cursorScreen
-      ? null // We can't compute live distance without a world position for cursor
-      : null
 
   return (
     <>

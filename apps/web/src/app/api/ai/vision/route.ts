@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server"
+import { guardApiRoute, isSafeAttachmentUrl, parsePositiveIntEnv } from "@/lib/server/api-guard"
 
 // MiniMax Coding Plan API — Chinese mainland: api.minimaxi.com, Global: api.minimax.io
 const MINIMAX_API_HOST = process.env.MINIMAX_API_HOST ?? "https://api.minimaxi.com"
+const MAX_PROMPT_CHARS = 4000
+const MAX_ATTACHMENTS = 6
 
 type IncomingRequest = {
   input: {
@@ -228,7 +231,52 @@ function createSSEStream(
 
 // ─── Route handler ───
 
+function validateIncomingRequest(body: IncomingRequest): string | null {
+  const allowedTaskTypes = new Set(["vision-detect", "narrative-summarize", "workflow-assist"])
+  if (!allowedTaskTypes.has(body.taskType)) {
+    return "Unsupported taskType"
+  }
+
+  const prompt = body.input?.prompt?.trim()
+  if (!prompt) {
+    return "Missing taskType or prompt"
+  }
+
+  if (prompt.length > MAX_PROMPT_CHARS) {
+    return "Prompt too long"
+  }
+
+  if ((body.input.attachments?.length ?? 0) > MAX_ATTACHMENTS) {
+    return "Too many attachments"
+  }
+
+  for (const attachment of body.input.attachments ?? []) {
+    if (!attachment.url || !isSafeAttachmentUrl(attachment.url, { allowDataImages: true })) {
+      return "Invalid attachment URL"
+    }
+  }
+
+  if (body.taskType === "vision-detect") {
+    const imageUrl = body.input.attachments?.find((attachment) => attachment.kind === "image")?.url
+    if (!imageUrl) {
+      return "Vision tasks require at least one image attachment"
+    }
+  }
+
+  return null
+}
+
 export async function POST(request: Request) {
+  const guard = guardApiRoute(request, {
+    apiKeyEnvVar: "INTERNAL_API_ROUTE_KEY",
+    maxRequests: parsePositiveIntEnv("AI_VISION_RATE_LIMIT_MAX", 12),
+    routeId: "ai-vision",
+    windowMs: parsePositiveIntEnv("AI_VISION_RATE_LIMIT_WINDOW_MS", 60_000),
+  })
+  if (guard) {
+    return guard
+  }
+
   const apiKey = process.env.MINIMAX_API_KEY
   if (!apiKey) {
     return NextResponse.json(
@@ -245,18 +293,9 @@ export async function POST(request: Request) {
   }
 
   const { taskType, input } = body
-  if (!taskType || !input?.prompt) {
-    return NextResponse.json({ detail: "Missing taskType or prompt" }, { status: 400 })
-  }
-
-  if (taskType === "vision-detect") {
-    const imageUrl = input.attachments?.find((a) => a.kind === "image")?.url
-    if (!imageUrl) {
-      return NextResponse.json(
-        { detail: "Vision tasks require at least one image attachment" },
-        { status: 400 }
-      )
-    }
+  const validationError = validateIncomingRequest(body)
+  if (validationError) {
+    return NextResponse.json({ detail: validationError }, { status: 400 })
   }
 
   return createSSEStream(async (emit) => {
@@ -275,7 +314,12 @@ async function streamVision(
   input: IncomingRequest["input"],
   emit: SSEEmit
 ) {
-  const imageUrl = input.attachments?.find((a) => a.kind === "image")?.url!
+  const imageAttachment = input.attachments?.find((a) => a.kind === "image")
+  if (!imageAttachment?.url) {
+    emit({ step: "error", progress: 0, message: "Vision tasks require at least one image attachment" })
+    return
+  }
+  const imageUrl = imageAttachment.url
 
   // Step 1: Web search for context enrichment
   emit({ step: "search", progress: 10 })

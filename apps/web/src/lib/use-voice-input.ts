@@ -14,6 +14,7 @@ export function useVoiceInput(onTranscript: (text: string) => void, options?: Vo
   const [error, setError] = useState<string | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
+  const locale = options?.locale
 
   const startRecording = useCallback(async () => {
     setError(null)
@@ -58,8 +59,8 @@ export function useVoiceInput(onTranscript: (text: string) => void, options?: Vo
           const formData = new FormData()
           const ext = mimeType.includes("webm") ? "webm" : "mp4"
           formData.append("file", audioBlob, `recording.${ext}`)
-          if (options?.locale) {
-            formData.append("language", options.locale)
+          if (locale) {
+            formData.append("language", locale)
           }
 
           const response = await fetch("/api/transcribe", {
@@ -89,7 +90,7 @@ export function useVoiceInput(onTranscript: (text: string) => void, options?: Vo
       setError("Microphone access denied")
       setState("idle")
     }
-  }, [onTranscript])
+  }, [locale, onTranscript])
 
   const stopRecording = useCallback(() => {
     const recorder = mediaRecorderRef.current

@@ -78,6 +78,18 @@ def test_review_queue_lists_pending_objects_with_context() -> None:
     assert payload["items"][0]["spaceId"] == "orchard-main-house"
 
 
+def test_space_workflow_readiness_reports_blockers() -> None:
+    response = client.get("/api/v1/workflows/spaces/orchard-main-house/readiness")
+
+    assert response.status_code == 200
+    payload = response.json()["readiness"]
+    assert payload["totalObjects"] == 4
+    assert payload["pendingReviewCount"] == 2
+    assert payload["exportReady"] is False
+    assert payload["shareReady"] is False
+    assert "pending-review" in payload["blockers"]
+
+
 def test_object_workflow_patch_updates_state_and_adds_audit_event() -> None:
     response = client.patch(
         "/api/v1/spaces/orchard-main-house/objects/walnut-cabinet",
@@ -110,6 +122,10 @@ def test_object_workflow_patch_updates_state_and_adds_audit_event() -> None:
     audit_response = client.get("/api/v1/workflows/audit-log?spaceId=orchard-main-house")
     assert audit_response.status_code == 200
     assert audit_response.json()["items"][0]["objectId"] == "walnut-cabinet"
+
+    readiness_response = client.get("/api/v1/workflows/spaces/orchard-main-house/readiness")
+    assert readiness_response.status_code == 200
+    assert readiness_response.json()["readiness"]["pendingReviewCount"] == 1
 
 
 def test_unknown_project_returns_404() -> None:

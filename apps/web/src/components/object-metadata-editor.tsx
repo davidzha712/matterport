@@ -20,6 +20,24 @@ type WorkflowUpdateResponse = {
   objectRecord: ObjectRecord
 }
 
+async function patchLocalObject(
+  updates: { id: string } & Partial<ObjectRecord>,
+): Promise<ObjectRecord> {
+  const response = await fetch("/api/objects", {
+    body: JSON.stringify(updates),
+    headers: { "Content-Type": "application/json" },
+    method: "PATCH",
+  })
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as { detail?: string } | null
+    throw new Error(payload?.detail ?? "Local save failed")
+  }
+
+  const payload = (await response.json()) as { object: ObjectRecord }
+  return payload.object
+}
+
 export function ObjectMetadataEditor({ objectRecord, spaceId }: ObjectMetadataEditorProps) {
   const router = useRouter()
   const t = useT()
@@ -63,11 +81,48 @@ export function ObjectMetadataEditor({ objectRecord, spaceId }: ObjectMetadataEd
       })
 
       if (!response.ok) {
+        if (response.status === 404) {
+          const updatedLocalObject = await patchLocalObject({
+            aiSummary: draft.aiSummary,
+            disposition: draft.disposition,
+            id: objectRecord.id,
+            spaceId,
+            status: draft.status,
+            title: draft.title,
+            type: draft.type,
+          })
+          setDraft((current) => ({
+            ...current,
+            aiSummary: updatedLocalObject.aiSummary,
+            disposition: updatedLocalObject.disposition,
+            note: "",
+            status: updatedLocalObject.status,
+            title: updatedLocalObject.title,
+            type: updatedLocalObject.type,
+          }))
+          setFeedback(t.objects.saved)
+          window.dispatchEvent(new CustomEvent("workflow-updated", { detail: { spaceId } }))
+          window.dispatchEvent(new CustomEvent("objects-updated"))
+          startTransition(() => {
+            router.refresh()
+          })
+          return
+        }
+
         const payload = (await response.json().catch(() => null)) as { detail?: string } | null
         throw new Error(payload?.detail ?? t.objects.saveFailed)
       }
 
       const payload = (await response.json()) as WorkflowUpdateResponse
+      await patchLocalObject({
+        aiSummary: payload.objectRecord.aiSummary,
+        disposition: payload.objectRecord.disposition,
+        id: objectRecord.id,
+        spaceId,
+        status: payload.objectRecord.status,
+        title: payload.objectRecord.title,
+        type: payload.objectRecord.type,
+      })
       setDraft((current) => ({
         ...current,
         aiSummary: payload.objectRecord.aiSummary,
@@ -79,6 +134,7 @@ export function ObjectMetadataEditor({ objectRecord, spaceId }: ObjectMetadataEd
       }))
       setFeedback(t.objects.saved)
       window.dispatchEvent(new CustomEvent("workflow-updated", { detail: { spaceId } }))
+      window.dispatchEvent(new CustomEvent("objects-updated"))
       startTransition(() => {
         router.refresh()
       })

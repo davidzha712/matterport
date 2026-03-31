@@ -70,64 +70,7 @@ PROJECT_RECORDS: list[ProjectRecord] = [
                         ),
                     ),
                 ],
-                objects=[
-                    ObjectRecord(
-                        aiSummary=(
-                            "Wahrscheinlich ein Aufbewahrungsschrank des fruehen 20. "
-                            "Jahrhunderts mit intakter Verbindungstechnik und gutem "
-                            "Wiederverkaufspotenzial nach Zustandspruefung."
-                        ),
-                        disposition="Sell",
-                        id="walnut-cabinet",
-                        roomId="living-room",
-                        roomName="Living Room",
-                        status="Needs Review",
-                        title="Walnut Cabinet",
-                        type="Furniture",
-                    ),
-                    ObjectRecord(
-                        aiSummary=(
-                            "Die Kaminuhr wirkt dekorativ und moeglicherweise emotional "
-                            "bedeutsam; vor jeder Entscheidung wird ein "
-                            "Provenienzgespraech empfohlen."
-                        ),
-                        disposition="Keep",
-                        id="mantel-clock",
-                        roomId="living-room",
-                        roomName="Living Room",
-                        status="Reviewed",
-                        title="Mantel Clock",
-                        type="Decor",
-                    ),
-                    ObjectRecord(
-                        aiSummary=(
-                            "Der grosse Schreibtisch mit Papieren und Schubladen deutet "
-                            "auf einen kombinierten Archiv- und Verwertungsprozess hin "
-                            "und verlangt eine zweigleisige Behandlung."
-                        ),
-                        disposition="Archive",
-                        id="atlas-desk",
-                        roomId="study",
-                        roomName="Study",
-                        status="Needs Review",
-                        title="Atlas Desk",
-                        type="Furniture",
-                    ),
-                    ObjectRecord(
-                        aiSummary=(
-                            "Briefe und Dokumente in Boxen sollten im Archivstatus "
-                            "bleiben, bis Digitalisierung oder familiaere Sichtung "
-                            "abgeschlossen sind."
-                        ),
-                        disposition="Archive",
-                        id="archive-box",
-                        roomId="study",
-                        roomName="Study",
-                        status="Approved",
-                        title="Archive Box",
-                        type="Document Set",
-                    ),
-                ],
+                objects=[],
                 workflow=WorkflowSummary(
                     approvedCount=1,
                     pendingReviewCount=2,

@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useT } from "@/lib/i18n"
+import { useLocale } from "@/lib/i18n"
 import { LocaleSwitcher } from "@/components/locale-switcher"
 import { getMatterportPreviewUrl } from "@/lib/matterport"
 import { buildSpaceRoute } from "@/lib/routes"
@@ -12,7 +12,7 @@ type LandingContentProps = {
 }
 
 export function LandingContent({ projects }: LandingContentProps) {
-  const t = useT()
+  const { locale, t } = useLocale()
   const allSpaces = projects.flatMap((p) => p.spaces)
   const featuredSpace = allSpaces.find((s) => s.matterportModelSid) ?? allSpaces[0]
 
@@ -24,7 +24,7 @@ export function LandingContent({ projects }: LandingContentProps) {
             allow="fullscreen; xr-spatial-tracking; accelerometer; gyroscope"
             className="landing__hero-embed"
             loading="eager"
-            src={getMatterportPreviewUrl(featuredSpace.matterportModelSid)}
+            src={getMatterportPreviewUrl(featuredSpace.matterportModelSid, locale)}
             title={featuredSpace.name}
           />
         ) : (
@@ -78,9 +78,8 @@ export function LandingContent({ projects }: LandingContentProps) {
                   {space.matterportModelSid ? (
                     <iframe
                       allow="fullscreen; xr-spatial-tracking; accelerometer; gyroscope"
-                      className="space-card__embed"
                       loading="lazy"
-                      src={getMatterportPreviewUrl(space.matterportModelSid)}
+                      src={getMatterportPreviewUrl(space.matterportModelSid, locale)}
                       title={space.name}
                     />
                   ) : (

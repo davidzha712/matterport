@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react"
 import { translations } from "./translations"
 
 export type Locale = "de" | "en"
@@ -14,32 +14,67 @@ type I18nContextValue = {
 }
 
 const I18nContext = createContext<I18nContextValue | null>(null)
+const LOCALE_CHANGE_EVENT = "matterport-locale-change"
+
+function isLocale(value: string | null): value is Locale {
+  return value === "de" || value === "en"
+}
+
+function readStoredLocale(defaultLocale: Locale): Locale {
+  if (typeof window === "undefined") {
+    return defaultLocale
+  }
+
+  const stored =
+    typeof window.localStorage?.getItem === "function"
+      ? window.localStorage.getItem("locale")
+      : null
+  return isLocale(stored) ? stored : defaultLocale
+}
+
+function subscribeLocale(onStoreChange: () => void) {
+  if (typeof window === "undefined") {
+    return () => {}
+  }
+
+  const notify = () => onStoreChange()
+  window.addEventListener("storage", notify)
+  window.addEventListener(LOCALE_CHANGE_EVENT, notify)
+
+  return () => {
+    window.removeEventListener("storage", notify)
+    window.removeEventListener(LOCALE_CHANGE_EVENT, notify)
+  }
+}
 
 export function LocaleProvider({ children, defaultLocale = "de" }: { children: ReactNode; defaultLocale?: Locale }) {
-  // Always start with defaultLocale to avoid hydration mismatch
-  const [locale, setLocaleState] = useState<Locale>(defaultLocale)
-
-  // Restore saved locale after mount (client-only)
-  useEffect(() => {
-    const stored = localStorage.getItem("locale")
-    if ((stored === "de" || stored === "en") && stored !== defaultLocale) {
-      setLocaleState(stored)
-    }
-  }, [defaultLocale])
+  const locale = useSyncExternalStore(
+    subscribeLocale,
+    () => readStoredLocale(defaultLocale),
+    () => defaultLocale
+  )
 
   const setLocale = useCallback((next: Locale) => {
-    setLocaleState(next)
     if (typeof window !== "undefined") {
-      localStorage.setItem("locale", next)
+      if (typeof window.localStorage?.setItem === "function") {
+        window.localStorage.setItem("locale", next)
+      }
       document.documentElement.lang = next
+      window.dispatchEvent(new Event(LOCALE_CHANGE_EVENT))
     }
   }, [])
+
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.documentElement.lang = locale
+    }
+  }, [locale])
 
   const t = useMemo(() => translations[locale], [locale])
 
   const value = useMemo(() => ({ locale, setLocale, t }), [locale, setLocale, t])
 
-  return <I18nContext value={value}>{children}</I18nContext>
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>
 }
 
 export function useLocale() {

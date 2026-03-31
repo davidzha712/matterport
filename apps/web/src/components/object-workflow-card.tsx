@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useRef, useState, useTransition } from "react"
+import { getBrowserApiBaseUrl } from "@/lib/browser-api"
 import { useT } from "@/lib/i18n"
 import type { ObjectRecord } from "@/lib/platform-types"
 import { toDisplayDisposition, toDisplayObjectStatus, toToneToken } from "@/lib/presentation"
@@ -41,6 +42,16 @@ async function patchObject(
   return payload.object
 }
 
+async function countOpenReviews(spaceId: string): Promise<number> {
+  const response = await fetch(`/api/objects?spaceId=${encodeURIComponent(spaceId)}`)
+  if (!response.ok) {
+    return 0
+  }
+
+  const payload = (await response.json()) as { objects: ObjectRecord[] }
+  return payload.objects.filter((objectRecord) => objectRecord.status === "Needs Review").length
+}
+
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -61,6 +72,7 @@ export function ObjectWorkflowCard({
 }) {
   const router = useRouter()
   const t = useT()
+  const apiBaseUrl = getBrowserApiBaseUrl()
   const [currentObject, setCurrentObject] = useState(objectRecord)
   const [note, setNote] = useState("")
   const [feedback, setFeedback] = useState<string | null>(null)
@@ -87,6 +99,13 @@ export function ObjectWorkflowCard({
     }
   }, [])
 
+  useEffect(() => {
+    setCurrentObject(objectRecord)
+    setNote("")
+    setFeedback(null)
+    setError(null)
+  }, [objectRecord])
+
   function updateObject(disposition: ObjectRecord["disposition"]) {
     setFeedback(null)
     setError(null)
@@ -95,7 +114,7 @@ export function ObjectWorkflowCard({
     void (async () => {
       try {
         const response = await fetch(
-          `/api/spaces/${spaceId}/objects/${currentObject.id}`,
+          `${apiBaseUrl}/spaces/${spaceId}/objects/${currentObject.id}`,
           {
             body: JSON.stringify({
               disposition,
@@ -110,17 +129,57 @@ export function ObjectWorkflowCard({
         )
 
         if (!response.ok) {
+          if (response.status === 404) {
+            const nextStatus =
+              currentObject.status === "Needs Review" ? "Reviewed" : currentObject.status
+            const updatedLocalObject = await patchObject({
+              id: currentObject.id,
+              disposition,
+              roomId: currentObject.roomId,
+              roomName: currentObject.roomName,
+              spaceId,
+              status: nextStatus,
+              title: currentObject.title,
+              type: currentObject.type,
+            })
+            const pendingReviewCount = await countOpenReviews(spaceId)
+            setCurrentObject(updatedLocalObject)
+            setFeedback(
+              `${toDisplayDisposition(updatedLocalObject.disposition)} ${t.objectCard.savedFeedback} ${pendingReviewCount} ${t.objectCard.openReviewsRemain}`
+            )
+            setNote("")
+            window.dispatchEvent(new CustomEvent("workflow-updated", { detail: { spaceId } }))
+            window.dispatchEvent(new CustomEvent("objects-updated"))
+            startTransition(() => {
+              router.refresh()
+            })
+            return
+          }
+
           const payload = (await response.json().catch(() => null)) as { detail?: string } | null
           throw new Error(payload?.detail ?? t.objectCard.saveFailed)
         }
 
         const payload = (await response.json()) as WorkflowUpdateResponse
-        setCurrentObject(payload.objectRecord)
+        const mergedObject = { ...currentObject, ...payload.objectRecord }
+        await patchObject({
+          id: currentObject.id,
+          aiSummary: payload.objectRecord.aiSummary,
+          disposition: payload.objectRecord.disposition,
+          roomId: payload.objectRecord.roomId,
+          roomName: payload.objectRecord.roomName,
+          spaceId,
+          status: payload.objectRecord.status,
+          title: payload.objectRecord.title,
+          type: payload.objectRecord.type,
+        })
+        setCurrentObject(mergedObject)
         setFeedback(
           `${toDisplayDisposition(payload.objectRecord.disposition)} ${t.objectCard.savedFeedback} ${payload.workflow.pendingReviewCount} ${t.objectCard.openReviewsRemain}`
         )
         setNote("")
         window.dispatchEvent(new CustomEvent("workflow-updated", { detail: { spaceId } }))
+        window.dispatchEvent(new CustomEvent("objects-updated"))
         startTransition(() => {
           router.refresh()
         })

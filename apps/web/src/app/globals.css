@@ -458,6 +458,8 @@ ul {
 .section-card {
   border-radius: var(--radius-xl);
   padding: 1.4rem;
+  background: rgba(10, 18, 25, 0.65);
+  backdrop-filter: blur(16px);
 }
 
 .section-card--narrow {
@@ -1250,7 +1252,9 @@ ul {
   flex-wrap: wrap;
   gap: 0.75rem;
   padding: 0.8rem;
-  background: rgba(7, 13, 19, 0.7);
+  background: rgba(7, 13, 19, 0.65);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
 
 .mode-rail__link {
@@ -1297,15 +1301,21 @@ ul {
   display: grid;
   gap: 1rem;
   padding: 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
   background:
-    linear-gradient(180deg, rgba(11, 18, 25, 0.84), rgba(7, 13, 19, 0.76)),
-    rgba(7, 13, 19, 0.76);
+    linear-gradient(180deg, rgba(11, 18, 25, 0.78), rgba(7, 13, 19, 0.65)),
+    rgba(7, 13, 19, 0.65);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
 
 .context-card--hero {
+  border-radius: var(--radius-lg);
   background:
-    linear-gradient(160deg, rgba(14, 24, 32, 0.88), rgba(8, 13, 19, 0.82)),
-    rgba(7, 13, 19, 0.76);
+    linear-gradient(160deg, rgba(14, 24, 32, 0.82), rgba(8, 13, 19, 0.72)),
+    rgba(7, 13, 19, 0.65);
+  border-color: rgba(202, 179, 117, 0.22);
 }
 
 .context-card__tabs {
@@ -1751,7 +1761,9 @@ ul {
   border: 1px solid var(--border);
   background:
     radial-gradient(circle at top left, rgba(238, 208, 138, 0.08), transparent 18%),
-    linear-gradient(145deg, rgba(14, 24, 32, 0.92), rgba(8, 13, 19, 0.88));
+    linear-gradient(145deg, rgba(14, 24, 32, 0.78), rgba(8, 13, 19, 0.72));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   box-shadow: var(--shadow);
 }
 
@@ -1907,16 +1919,14 @@ ul {
   gap: 1rem;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
-
 .review-card {
   display: grid;
   gap: 1rem;
   padding: 1.1rem;
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
-  background:
-    radial-gradient(circle at top left, rgba(238, 208, 138, 0.12), transparent 24%),
-    linear-gradient(145deg, rgba(16, 29, 39, 0.9), rgba(8, 13, 19, 0.9));
+  background: rgba(10, 18, 25, 0.65);
+  backdrop-filter: blur(16px);
 }
 
 .review-card__header {
@@ -2999,9 +3009,9 @@ ul {
 
 /* Enter Immersive button */
 .immersive-enter-btn {
-  position: absolute;
+  position: fixed;
+  left: calc((100vw - var(--right-panel-width, 0rem)) / 2);
   top: 50%;
-  left: 50%;
   transform: translate(-50%, -50%);
   z-index: 30;
   display: flex;
@@ -3040,7 +3050,7 @@ ul {
 .immersive-enter-btn:hover {
   background: rgba(203, 176, 110, 0.12);
   border-color: var(--accent);
-  transform: translate(-50%, -50%) translateY(-2px);
+  transform: translate(-50%, calc(-50% - 2px));
 }
 
 .immersive-enter-btn__icon {
@@ -4109,7 +4119,8 @@ ul {
 }
 
 [data-stage-mode="work"] .context-card {
-  background: rgba(10, 18, 25, 0.94);
+  background: rgba(10, 18, 25, 0.65);
+  backdrop-filter: blur(16px);
   border: 1px solid rgba(111, 202, 155, 0.15);
   border-radius: 10px;
 }
@@ -4279,7 +4290,8 @@ ul {
 }
 
 [data-stage-mode="review"] .context-card {
-  background: rgba(10, 18, 25, 0.94);
+  background: rgba(10, 18, 25, 0.65);
+  backdrop-filter: blur(16px);
   border: 1px solid rgba(200, 160, 60, 0.12);
   border-radius: 8px;
 }
@@ -4441,12 +4453,18 @@ ul {
   border: none;
   border-radius: 999px;
   cursor: pointer;
+  touch-action: manipulation;
   transition: background 0.2s, transform 0.15s;
 }
 
 .listing-share-btn:hover {
   background: hsl(350 75% 48%);
   transform: scale(1.03);
+}
+
+.listing-share-btn:focus-visible {
+  outline: 2px solid hsl(350 85% 70%);
+  outline-offset: 2px;
 }
 
 /* Property highlights */
@@ -4490,19 +4508,26 @@ ul {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0.2rem;
+  align-items: flex-start;
+  gap: 0.35rem;
   padding: 0.5rem 1rem;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
   cursor: pointer;
+  text-decoration: none;
+  touch-action: manipulation;
   transition: background 0.2s, border-color 0.2s;
   min-width: 6rem;
 }
 
 .filmstrip-nav__item:hover {
   background: rgba(255, 255, 255, 0.1);
+}
+
+.filmstrip-nav__item:focus-visible {
+  outline: 2px solid hsl(var(--mode-accent) / 0.7);
+  outline-offset: 2px;
 }
 
 .filmstrip-nav__item--active {
@@ -4519,6 +4544,29 @@ ul {
 .filmstrip-nav__count {
   font-size: 0.65rem;
   color: rgba(255, 255, 255, 0.4);
+}
+
+.filmstrip-nav__meta {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.filmstrip-nav__status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.2rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.62rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.filmstrip-nav__status--reviewed {
+  background: rgba(79, 209, 131, 0.14);
+  color: rgba(176, 245, 199, 0.95);
 }
 
 /* Listing mode: no right panel → annotation panel extends to right edge */

@@ -1,12 +1,13 @@
 "use client"
 
 import Link from "next/link"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import type { ObjectRecord, ProviderProfile, RoomRecord, SpaceRecord } from "@/lib/platform-types"
 import { ObjectWorkflowCard } from "@/components/object-workflow-card"
 import { WorkflowSidebar } from "@/components/workflow-sidebar"
 import { useBridge } from "@/lib/bridge-context"
 import { useT } from "@/lib/i18n"
+import { getWorkflowReadiness } from "@/lib/workflow-readiness"
 import { buildObjectRoute, buildRoomRoute } from "@/lib/routes"
 
 type ContextPanelProps = {
@@ -29,8 +30,8 @@ type ContextPanelProps = {
 export function ContextPanel({ apiObjects, panelConfig, providers, selectedObject, selectedRoom, showReviewCounts, space }: ContextPanelProps) {
   const { bridge, status, currentRoom: sdkRoom, sdkRooms } = useBridge()
   const t = useT()
-  const [detectedObjects, setDetectedObjects] = useState<ObjectRecord[]>([])
-  const [selectedDetectedObject, setSelectedDetectedObject] = useState<ObjectRecord | null>(null)
+  const [fetchedDetectedObjects, setFetchedDetectedObjects] = useState<ObjectRecord[]>([])
+  const [selectedDetectedObjectId, setSelectedDetectedObjectId] = useState<string | null>(null)
 
   // Match SDK room to our data model for reactive room tracking
   const matchedRoom = sdkRoom
@@ -55,52 +56,104 @@ export function ContextPanel({ apiObjects, panelConfig, providers, selectedObjec
         }
       : undefined
 
-  const focalRoom = selectedRoom ?? matchedRoom ?? sdkFallbackRoom ?? space.rooms[0]
-  const focalObject = selectedObject ?? space.objects.find((o) => o.roomId === focalRoom.id) ?? space.objects[0]
-  const objectRoute = buildObjectRoute(space.id, focalObject.id)
-
-  // Reset selected detected object when room changes
-  useEffect(() => {
-    setSelectedDetectedObject(null)
-  }, [focalRoom.id])
-
-  // Derive detected objects: prefer parent-supplied apiObjects (already fetched),
-  // filtered to the current room. Fall back to a room-scoped fetch when not supplied.
-  const fetchDetectedObjects = useCallback(async () => {
-    if (apiObjects !== undefined) {
-      const roomObjects = apiObjects.filter(
-        (o) =>
-          o.roomId === focalRoom.id ||
-          o.roomName?.toLowerCase() === focalRoom.name.toLowerCase()
-      )
-      setDetectedObjects(roomObjects)
-      return
+  const focalRoom = matchedRoom ?? selectedRoom ?? sdkFallbackRoom ?? space.rooms[0] ?? {
+    id: "",
+    name: space.name,
+    objectIds: [],
+    pendingReviewCount: 0,
+    priorityBand: "Medium" as const,
+    recommendation: "",
+    summary: "",
+  }
+  const roomScopedApiObjects = useMemo(() => {
+    if (apiObjects === undefined) {
+      return undefined
     }
+
+    return apiObjects.filter(
+      (objectRecord) =>
+        (focalRoom.id && objectRecord.roomId === focalRoom.id) ||
+        objectRecord.roomName?.toLowerCase() === focalRoom.name.toLowerCase()
+    )
+  }, [apiObjects, focalRoom.id, focalRoom.name])
+
+  const defaultObject =
+    selectedObject ??
+    roomScopedApiObjects?.[0] ??
+    space.objects.find((objectRecord) => objectRecord.roomId === focalRoom.id)
+
+  const loadDetectedObjects = useCallback(async () => {
     try {
       const params = new URLSearchParams({ spaceId: space.id })
       if (focalRoom.id) params.set("roomId", focalRoom.id)
       const res = await fetch(`/api/objects?${params.toString()}`)
       if (res.ok) {
         const data = (await res.json()) as { objects: ObjectRecord[] }
-        setDetectedObjects(data.objects)
+        return data.objects
       }
     } catch {
       // Best-effort
     }
-  }, [apiObjects, space.id, focalRoom.id, focalRoom.name])
+
+    return null
+  }, [focalRoom.id, space.id])
 
   useEffect(() => {
-    void fetchDetectedObjects()
-  }, [fetchDetectedObjects])
+    if (roomScopedApiObjects !== undefined) {
+      return
+    }
+
+    let ignore = false
+
+    async function syncDetectedObjects() {
+      const nextObjects = await loadDetectedObjects()
+      if (!ignore && nextObjects) {
+        setFetchedDetectedObjects(nextObjects)
+      }
+    }
+
+    void syncDetectedObjects()
+
+    return () => {
+      ignore = true
+    }
+  }, [loadDetectedObjects, roomScopedApiObjects])
 
   // Re-fetch when objects are updated (from stage-controls batch save)
   useEffect(() => {
-    function onUpdated() {
-      void fetchDetectedObjects()
+    if (roomScopedApiObjects !== undefined) {
+      return
     }
+
+    let ignore = false
+
+    function onUpdated() {
+      void loadDetectedObjects().then((nextObjects) => {
+        if (!ignore && nextObjects) {
+          setFetchedDetectedObjects(nextObjects)
+        }
+      })
+    }
+
     window.addEventListener("objects-updated", onUpdated)
-    return () => window.removeEventListener("objects-updated", onUpdated)
-  }, [fetchDetectedObjects])
+    return () => {
+      ignore = true
+      window.removeEventListener("objects-updated", onUpdated)
+    }
+  }, [loadDetectedObjects, roomScopedApiObjects])
+
+  const detectedObjects = roomScopedApiObjects ?? fetchedDetectedObjects
+  const selectedDetectedObject = useMemo(
+    () => detectedObjects.find((objectRecord) => objectRecord.id === selectedDetectedObjectId) ?? null,
+    [detectedObjects, selectedDetectedObjectId]
+  )
+  const focalObject = selectedDetectedObject ?? defaultObject
+  const objectRoute = focalObject ? buildObjectRoute(space.id, focalObject.id) : ""
+  const roomObjectCount = detectedObjects.length > 0 ? detectedObjects.length : focalRoom.objectIds.length
+  const workflowReadiness = useMemo(
+    () => getWorkflowReadiness(space, apiObjects && apiObjects.length > 0 ? apiObjects : undefined),
+    [apiObjects, space],
+  )
 
   const handleRoomClick = useCallback(
     (e: React.MouseEvent, roomId: string) => {
@@ -114,15 +167,43 @@ export function ContextPanel({ apiObjects, panelConfig, providers, selectedObjec
 
   const handleDetectedObjectClick = useCallback(
     (obj: ObjectRecord) => {
-      setSelectedDetectedObject((prev) => (prev?.id === obj.id ? null : obj))
+      setSelectedDetectedObjectId((prev) => (prev === obj.id ? null : obj.id))
     },
     []
   )
 
+  useEffect(() => {
+    function onTagClicked(event: Event) {
+      const annotationId = (event as CustomEvent<{ annotationId?: string }>).detail.annotationId
+      if (!annotationId) return
+
+      const annotation = bridge.getAnnotations().find((candidate) => candidate.id === annotationId)
+      if (!annotation) return
+
+      const nextObject =
+        (annotation.objectId
+          ? detectedObjects.find((objectRecord) => objectRecord.id === annotation.objectId)
+          : undefined) ??
+        (annotation.tagId
+          ? detectedObjects.find((objectRecord) => objectRecord.tagId === annotation.tagId)
+          : undefined) ??
+        detectedObjects.find(
+          (objectRecord) => objectRecord.title.trim().toLowerCase() === annotation.label.trim().toLowerCase()
+        )
+
+      if (nextObject) {
+        setSelectedDetectedObjectId(nextObject.id)
+      }
+    }
+
+    window.addEventListener("annotation-tag-clicked", onTagClicked)
+    return () => window.removeEventListener("annotation-tag-clicked", onTagClicked)
+  }, [bridge, detectedObjects])
+
   return (
     <aside className="context-panel" aria-label={t.stage.roomContext}>
       <div className="context-panel__handle" aria-hidden="true" />
-      {panelConfig?.objectWorkflowCard === true ? (
+      {panelConfig?.objectWorkflowCard === true && focalObject ? (
         <ObjectWorkflowCard objectRecord={focalObject} objectRoute={objectRoute} spaceId={space.id} />
       ) : null}
 
@@ -138,7 +219,7 @@ export function ContextPanel({ apiObjects, panelConfig, providers, selectedObjec
         </div>
         <p>{focalRoom.summary}</p>
         <ul className="context-list">
-          <li>{t.common.objects}: {focalRoom.objectIds.length}</li>
+          <li>{t.common.objects}: {roomObjectCount}</li>
           <li>{t.objects.disposition}: {focalRoom.priorityBand}</li>
           <li>{focalRoom.recommendation}</li>
         </ul>
@@ -168,7 +249,13 @@ export function ContextPanel({ apiObjects, panelConfig, providers, selectedObjec
                           onClick={(e) => handleRoomClick(e, room.id)}
                         >
                           <span>{room.name}</span>
-                          <small>{dataRoom ? `${dataRoom.objectIds.length} ${t.common.objects.toLowerCase()}` : "SDK"}</small>
+                          <small>
+                            {dataRoom
+                              ? dataRoom.pendingReviewCount === 0
+                                ? `${dataRoom.objectIds.length} ${t.common.objects.toLowerCase()} · ${t.contextPanel.roomReady}`
+                                : `${dataRoom.pendingReviewCount} ${t.contextPanel.roomPending}`
+                              : "SDK"}
+                          </small>
                         </Link>
                       </li>
                     )
@@ -181,7 +268,11 @@ export function ContextPanel({ apiObjects, panelConfig, providers, selectedObjec
                         onClick={(e) => handleRoomClick(e, room.id)}
                       >
                         <span>{room.name}</span>
-                        <small>{room.objectIds.length} {t.common.objects.toLowerCase()}</small>
+                        <small>
+                          {room.pendingReviewCount === 0
+                            ? `${room.objectIds.length} ${t.common.objects.toLowerCase()} · ${t.contextPanel.roomReady}`
+                            : `${room.pendingReviewCount} ${t.contextPanel.roomPending}`}
+                        </small>
                       </Link>
                     </li>
                   ))
@@ -190,15 +281,6 @@ export function ContextPanel({ apiObjects, panelConfig, providers, selectedObjec
           </div>
         ) : null}
       </section>
-
-      {/* Inline workflow card for a detected object selected from the list */}
-      {selectedDetectedObject ? (
-        <ObjectWorkflowCard
-          objectRecord={selectedDetectedObject}
-          objectRoute={buildObjectRoute(space.id, selectedDetectedObject.id)}
-          spaceId={space.id}
-        />
-      ) : null}
 
       {/* AI-detected objects for current room */}
       {panelConfig?.aiDetections === true && detectedObjects.length > 0 ? (
@@ -271,7 +353,7 @@ export function ContextPanel({ apiObjects, panelConfig, providers, selectedObjec
         </ul>
       </section>
       {panelConfig?.workflowSidebar === true ? (
-        <WorkflowSidebar providers={providers} spaceId={space.id} />
+        <WorkflowSidebar providers={providers} readiness={workflowReadiness} spaceId={space.id} />
       ) : null}
       <Link className="primary-link" href="/settings/providers">
         {t.providers.headline}

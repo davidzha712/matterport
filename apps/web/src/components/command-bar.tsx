@@ -1,7 +1,7 @@
 "use client"
 
 import type { ChangeEvent, FormEvent } from "react"
-import { useCallback, useDeferredValue, useEffect, useRef, useState, useTransition } from "react"
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { useBridge } from "@/lib/bridge-context"
 import { useLocale } from "@/lib/i18n"
 import { useVoiceCommands } from "@/lib/use-voice-commands"
@@ -137,9 +137,11 @@ export function CommandBar({ room, space }: CommandBarProps) {
 
   // Listen for auto-vision-analyze event (V key in immersive mode)
   const formRef = useRef<HTMLFormElement>(null)
+  const submittingRef = useRef(false)
   useEffect(() => {
     function onAutoAnalyze() {
-      // Trigger form submission programmatically
+      // Skip if already submitting — prevents duplicate analysis from rapid V presses
+      if (submittingRef.current) return
       formRef.current?.requestSubmit()
     }
 
@@ -147,16 +149,19 @@ export function CommandBar({ room, space }: CommandBarProps) {
     return () => window.removeEventListener("auto-vision-analyze", onAutoAnalyze)
   }, [])
 
-  const activeAttachment =
-    imageAttachment ??
-    (imageUrl.trim()
-      ? {
-          label: t.ai.externalImageUrl,
-          origin: "remote-url" as const,
-          previewUrl: imageUrl.trim(),
-          url: imageUrl.trim()
-        }
-      : null)
+  const activeAttachment = useMemo(
+    () =>
+      imageAttachment ??
+      (imageUrl.trim()
+        ? {
+            label: t.ai.externalImageUrl,
+            origin: "remote-url" as const,
+            previewUrl: imageUrl.trim(),
+            url: imageUrl.trim()
+          }
+        : null),
+    [imageAttachment, imageUrl, t.ai.externalImageUrl]
+  )
   const requiresImage = taskType === "vision-detect"
   const isSubmitDisabled = isSubmitting || isPending || isReadingImage || (requiresImage && !activeAttachment)
 
@@ -215,6 +220,8 @@ export function CommandBar({ room, space }: CommandBarProps) {
   const handleSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault()
+      if (submittingRef.current) return
+      submittingRef.current = true
       setError(null)
       setIsSubmitting(true)
 
@@ -350,6 +357,10 @@ export function CommandBar({ room, space }: CommandBarProps) {
               window.dispatchEvent(
                 new CustomEvent("annotations-from-ai", {
                   detail: {
+                    captureDataUrl:
+                      activeAttachment?.origin === "sdk-capture"
+                        ? activeAttachment.url
+                        : undefined,
                     items,
                     screenshotPose: submitPose,
                     spaceId: space.id,
@@ -374,6 +385,7 @@ export function CommandBar({ room, space }: CommandBarProps) {
             emitProgress(null)
           })
         } finally {
+          submittingRef.current = false
           setIsSubmitting(false)
         }
       })()

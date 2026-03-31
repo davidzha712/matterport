@@ -53,9 +53,9 @@ const BASE_PARAMS: Record<string, string> = {
 }
 
 /** Full SDK embed URL — includes applicationKey so the parent can connect via mpSdk */
-export function getMatterportEmbedUrl(modelSid: string): string {
+export function getMatterportEmbedUrl(modelSid: string, locale: "en" | "de" = "de"): string {
   const sdkKey = process.env.NEXT_PUBLIC_MATTERPORT_SDK_KEY
-  const params: Record<string, string> = { m: modelSid, ...BASE_PARAMS }
+  const params: Record<string, string> = { m: modelSid, lang: locale, ...BASE_PARAMS }
 
   if (sdkKey) {
     params.applicationKey = sdkKey
@@ -66,7 +66,7 @@ export function getMatterportEmbedUrl(modelSid: string): string {
 
 /** Preview-only embed URL — NO applicationKey so the viewer renders standalone
  *  without waiting for an SDK connection from the parent page. */
-export function getMatterportPreviewUrl(modelSid: string): string {
-  const params: Record<string, string> = { m: modelSid, ...BASE_PARAMS }
+export function getMatterportPreviewUrl(modelSid: string, locale: "en" | "de" = "de"): string {
+  const params: Record<string, string> = { m: modelSid, lang: locale, ...BASE_PARAMS }
   return `https://my.matterport.com/show/?${new URLSearchParams(params).toString()}`
 }

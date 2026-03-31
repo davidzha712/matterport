@@ -22,6 +22,18 @@ interface CameraPose {
   sweep: string
 }
 
+/** A depth sample captured at screenshot time for 2D→3D projection. */
+interface DepthSample {
+  /** Normalised screen coordinate 0..1 */
+  nx: number
+  /** Normalised screen coordinate 0..1 */
+  ny: number
+  /** World position of the surface at this screen point */
+  worldPos: Vector3
+  /** Distance from camera to this surface point (metres) */
+  depth: number
+}
+
 interface SweepData {
   sid: string
   position: Vector3
@@ -179,6 +191,7 @@ interface MpSdk {
     editOpacity: (id: string, opacity: number) => Promise<void>
     open: (id: string) => Promise<void>
     close: (id: string) => Promise<void>
+    toggleNavControls?: (enabled: boolean) => Promise<void>
     data: CollectionObservable<TagData>
     Event: { CLICK: string; HOVER: string }
   }
@@ -292,12 +305,14 @@ export class MatterportBridge {
   private _currentFloor: { id: string; sequence: number } | undefined = undefined
   private _lastPose: CameraPose | null = null
   private _screenshotPose: CameraPose | null = null
+  private _screenshotDepthGrid: DepthSample[] = []
 
   private _sweeps: SweepData[] = []
   private _rooms: RoomData[] = []
   private _floors: FloorData[] = []
   private _tags: TagData[] = []
   private _tourSnapshots: TourSnapshot[] = []
+  private _sdkTourStarted = false
   private _modelDetails: ModelDetails | null = null
 
   // -----------------------------------------------------------------------
@@ -354,7 +369,13 @@ export class MatterportBridge {
 
   /** Camera pose captured at the moment of the last screenshot. */
   get screenshotPose(): CameraPose | null {
-    return this._screenshotPose ? { ...this._screenshotPose } : null
+    return this._screenshotPose
+      ? {
+          ...this._screenshotPose,
+          position: { ...this._screenshotPose.position },
+          rotation: { ...this._screenshotPose.rotation },
+        }
+      : null
   }
 
   // -----------------------------------------------------------------------
@@ -392,7 +413,6 @@ export class MatterportBridge {
       ])
 
       this.sdk = mpSdk
-      this._status = "sdk-connected"
 
       this.initSubscriptions()
 
@@ -412,10 +432,14 @@ export class MatterportBridge {
 
       // Hide Matterport's built-in navigation overlay controls
       try {
-        await (this.sdk as any).Tag?.toggleNavControls?.(false)
+        await this.sdk.Tag.toggleNavControls?.(false)
       } catch {
         // toggleNavControls not available in this SDK version
       }
+
+      // Mark as fully connected AFTER model data is loaded — ensures that
+      // components (loadFromApi, auto-tour) only run when sweeps/rooms are ready
+      this._status = "sdk-connected"
     } catch (error) {
       console.error("Matterport SDK connection failed:", error)
     }
@@ -440,6 +464,7 @@ export class MatterportBridge {
     this.iframe = null
     this._status = "disconnected"
     this._isTourActive = false
+    this._sdkTourStarted = false
     this._currentSweep = null
     this._currentRoom = undefined
     this._currentMode = ""
@@ -587,7 +612,7 @@ export class MatterportBridge {
     try {
       await this.sdk.Tour.start(startIndex)
       return true
-    } catch (error) {
+    } catch {
       // Expected SDK behavior — another transition is active, silently return false
       return false
     }
@@ -597,6 +622,8 @@ export class MatterportBridge {
     if (!this.sdk) {
       return false
     }
+
+    this._sdkTourStarted = false
 
     try {
       await this.sdk.Tour.stop()
@@ -658,7 +685,7 @@ export class MatterportBridge {
     anchorPosition: Vector3
     stemVector?: Vector3
     color?: { r: number; g: number; b: number }
-  }): Promise<string | null> {
+  }, annotationId?: string): Promise<string | null> {
     if (!this.sdk) {
       return null
     }
@@ -673,7 +700,11 @@ export class MatterportBridge {
           : { x: 0, y: 0.15, z: 0 },
         color: data.color,
       })
-      return ids[0] ?? null
+      const tagId = ids[0] ?? null
+      if (tagId && annotationId) {
+        this.annotationToTagId.set(annotationId, tagId)
+      }
+      return tagId
     } catch (error) {
       console.error("addTag failed:", error)
       return null
@@ -687,6 +718,13 @@ export class MatterportBridge {
 
     try {
       await this.sdk.Tag.remove(id)
+      // Clean up mapping
+      for (const [annId, tId] of this.annotationToTagId.entries()) {
+        if (tId === id) {
+          this.annotationToTagId.delete(annId)
+          break
+        }
+      }
       return true
     } catch (error) {
       console.error("removeTag failed:", error)
@@ -720,19 +758,12 @@ export class MatterportBridge {
       const hexColor = annotation.color ?? "#ff3333"
       const rgb = hexToRgb(hexColor)
 
-      this.addTag({
+      void this.addTag({
         label: annotation.label,
         description: annotation.description,
         anchorPosition: { ...annotation.position },
         color: rgb,
-      }).then((tagId) => {
-        if (tagId) {
-          this.annotationToTagId = new Map(this.annotationToTagId).set(
-            annotation.id,
-            tagId
-          )
-        }
-      })
+      }, annotation.id)
     }
 
     return annotation
@@ -759,19 +790,12 @@ export class MatterportBridge {
           const hexColor = updated.color ?? "#ff3333"
           const rgb = hexToRgb(hexColor)
 
-          this.addTag({
+          void this.addTag({
             label: updated.label,
             description: updated.description,
             anchorPosition: { ...updated.position },
             color: rgb,
-          }).then((newTagId) => {
-            if (newTagId) {
-              this.annotationToTagId = new Map(this.annotationToTagId).set(
-                id,
-                newTagId
-              )
-            }
-          })
+          }, id)
         })
       }
     }
@@ -813,31 +837,130 @@ export class MatterportBridge {
       return null
     }
 
-    // Save camera pose atomically with screenshot — used later for 2D→3D projection
-    this._screenshotPose = this._lastPose ? { ...this._lastPose } : null
+    // Save camera pose atomically with screenshot — used later for 2D→3D projection.
+    // Deep-copy nested objects so later pose updates don't corrupt the saved snapshot.
+    this._screenshotPose = this._lastPose
+      ? {
+          ...this._lastPose,
+          position: { ...this._lastPose.position },
+          rotation: { ...this._lastPose.rotation },
+        }
+      : null
 
-    // Try with requested resolution, fallback to smaller, then no-args
+    // Take the screenshot FIRST so the image matches the saved pose as closely
+    // as possible, then sample the depth grid while the caller processes the image.
     const resolutions: Array<ScreenshotResolution | undefined> = [
       resolution ?? { width: 1920, height: 1080 },
       { width: 1280, height: 720 },
       undefined,
     ]
 
+    let result: string | null = null
     for (const res of resolutions) {
       try {
         const base64 = res
           ? await this.sdk.Renderer.takeScreenShot(res)
           : await this.sdk.Renderer.takeScreenShot()
-        return base64.startsWith("data:")
+        result = base64.startsWith("data:")
           ? base64
           : `data:image/png;base64,${base64}`
+        break
       } catch {
         // try next resolution
       }
     }
 
-    console.error("captureScreenshot: all attempts failed")
-    return null
+    if (!result) {
+      console.error("captureScreenshot: all attempts failed")
+      return null
+    }
+
+    // Sample depth grid AFTER screenshot but BEFORE returning, so all depth
+    // queries complete while the camera is still at the screenshot viewpoint.
+    // This prevents auto-tour from moving the camera before depths resolve.
+    await this.sampleDepthGrid()
+
+    return result
+  }
+
+  /**
+   * Sample a grid of depth points from the current camera viewpoint.
+   * Called at screenshot time so that later 2D→3D projection uses real
+   * scene geometry instead of estimated room AABB depths.
+   *
+   * The grid covers the full viewport in a 5×5 pattern (25 samples).
+   * Each sample records the normalised screen coordinate and the
+   * distance from the camera to the first surface intersection.
+   */
+  private async sampleDepthGrid(): Promise<void> {
+    const iframeSize = this.getIframeSize()
+    if (!iframeSize || !this.sdk || !this._lastPose) {
+      this._screenshotDepthGrid = []
+      return
+    }
+
+    const GRID = 5
+    // Snapshot camera position so async depth queries use a stable value
+    const camPos = { ...this._lastPose.position }
+    const promises: Promise<DepthSample | null>[] = []
+
+    for (let row = 0; row < GRID; row++) {
+      for (let col = 0; col < GRID; col++) {
+        const nx = (col + 0.5) / GRID
+        const ny = (row + 0.5) / GRID
+        const sx = nx * iframeSize.width
+        const sy = ny * iframeSize.height
+
+        promises.push(
+          this.sdk.Renderer.getWorldPositionData({ x: sx, y: sy })
+            .then((data: { position: Vector3 | null }) => {
+              if (!data.position) return null
+              const dx = data.position.x - camPos.x
+              const dy = data.position.y - camPos.y
+              const dz = data.position.z - camPos.z
+              return {
+                nx,
+                ny,
+                worldPos: data.position,
+                depth: Math.sqrt(dx * dx + dy * dy + dz * dz),
+              }
+            })
+            .catch(() => null)
+        )
+      }
+    }
+
+    const results = await Promise.all(promises)
+    this._screenshotDepthGrid = results.filter((s): s is DepthSample => s !== null)
+  }
+
+  /**
+   * Interpolate depth from the screenshot depth grid for a normalised
+   * screen coordinate (0..1).  Uses inverse-distance weighting from the
+   * nearest samples.  Returns null if fewer than 2 valid samples exist.
+   */
+  private interpolateDepthFromGrid(nx: number, ny: number): number | null {
+    const grid = this._screenshotDepthGrid
+    if (grid.length < 2) return null
+
+    // Inverse-distance weighting (IDW) with p=2
+    let weightSum = 0
+    let depthSum = 0
+    const EPSILON = 0.001
+
+    for (const sample of grid) {
+      const dx = nx - sample.nx
+      const dy = ny - sample.ny
+      const dist = Math.sqrt(dx * dx + dy * dy)
+
+      if (dist < EPSILON) return sample.depth // Exact match
+
+      const w = 1 / (dist * dist)
+      weightSum += w
+      depthSum += w * sample.depth
+    }
+
+    return weightSum > 0 ? depthSum / weightSum : null
   }
 
   // -----------------------------------------------------------------------
@@ -845,7 +968,13 @@ export class MatterportBridge {
   // -----------------------------------------------------------------------
 
   getCameraPose(): CameraPose | null {
-    return this._lastPose ? { ...this._lastPose } : null
+    return this._lastPose
+      ? {
+          ...this._lastPose,
+          position: { ...this._lastPose.position },
+          rotation: { ...this._lastPose.rotation },
+        }
+      : null
   }
 
   async rotateCamera(horizontal: number, vertical: number): Promise<boolean> {
@@ -1008,14 +1137,27 @@ export class MatterportBridge {
     // Check if camera has moved since screenshot — if so, raycast is unreliable
     const cameraMoved = this.hasCameraMoved(effectivePose, this._lastPose)
 
+    // ── diagnostic (remove after debugging) ──
+    console.debug("[bbox→3D] bbox:", bbox, "res:", screenshotRes,
+      "cameraMoved:", cameraMoved,
+      "savedPose pos:", savedPose?.position, "rot:", savedPose?.rotation,
+      "currentPose pos:", this._lastPose?.position, "rot:", this._lastPose?.rotation,
+      "depthGrid samples:", this._screenshotDepthGrid.length)
+
     if (cameraMoved) {
       // Camera moved during AI analysis — use mathematical projection with saved pose
-      return this.projectBboxWithPose(bbox, screenshotRes, effectivePose)
+      const result = this.projectBboxWithPose(bbox, screenshotRes, effectivePose)
+      console.debug("[bbox→3D] PATH: math-projection (camera moved), result:", result)
+      return result
     }
 
     // Camera hasn't moved — raycast is accurate
     const iframeSize = this.getIframeSize()
-    if (!iframeSize) return this.projectBboxWithPose(bbox, screenshotRes, effectivePose)
+    if (!iframeSize) {
+      const result = this.projectBboxWithPose(bbox, screenshotRes, effectivePose)
+      console.debug("[bbox→3D] PATH: math-projection (no iframe), result:", result)
+      return result
+    }
 
     const scaleX = iframeSize.width / screenshotRes.width
     const scaleY = iframeSize.height / screenshotRes.height
@@ -1026,7 +1168,10 @@ export class MatterportBridge {
 
     // Try center point raycast
     const centerHit = await this.screenToWorld(centerX, centerY)
-    if (centerHit) return centerHit
+    if (centerHit) {
+      console.debug("[bbox→3D] PATH: raycast-center, screenPt:", { centerX, centerY }, "iframeSize:", iframeSize, "result:", centerHit)
+      return centerHit
+    }
 
     // Multi-point sampling within the bbox
     const bboxW = (x2 - x1) * scaleX
@@ -1050,15 +1195,19 @@ export class MatterportBridge {
     }
 
     if (hits.length > 0) {
-      return {
+      const result = {
         x: hits.reduce((s, h) => s + h.x, 0) / hits.length,
         y: hits.reduce((s, h) => s + h.y, 0) / hits.length,
         z: hits.reduce((s, h) => s + h.z, 0) / hits.length,
       }
+      console.debug("[bbox→3D] PATH: raycast-multipoint, hits:", hits.length, "result:", result)
+      return result
     }
 
     // All raycasts missed — mathematical fallback
-    return this.projectBboxWithPose(bbox, screenshotRes, effectivePose)
+    const result = this.projectBboxWithPose(bbox, screenshotRes, effectivePose)
+    console.debug("[bbox→3D] PATH: math-fallback (all raycasts missed), result:", result)
+    return result
   }
 
   /**
@@ -1119,13 +1268,16 @@ export class MatterportBridge {
     const cosP = Math.cos(pitch)
     const sinP = Math.sin(pitch)
 
-    // Pitch around X, then yaw around Y
+    // Pitch around X, then yaw around Y.
+    // Matterport yaw rotates CLOCKWISE from above (+yaw = turn right),
+    // which is the OPPOSITE of the standard counter-clockwise right-hand rule,
+    // so sinY terms are negated relative to the standard rotation matrix.
     const apX = dirCamX
     const apY = dirCamY * cosP - dirCamZ * sinP
     const apZ = dirCamY * sinP + dirCamZ * cosP
-    const wdX = apX * cosY + apZ * sinY
+    const wdX = apX * cosY - apZ * sinY
     const wdY = apY
-    const wdZ = -apX * sinY + apZ * cosY
+    const wdZ = apX * sinY + apZ * cosY
 
     const len = Math.sqrt(wdX * wdX + wdY * wdY + wdZ * wdZ)
     if (len < 1e-8) return null
@@ -1134,8 +1286,16 @@ export class MatterportBridge {
     const dirNormY = wdY / len
     const dirNormZ = wdZ / len
 
-    // Estimate depth by intersecting ray with room AABB bounds
-    const depth = this.estimateDepthFromRooms(pose.position, { x: dirNormX, y: dirNormY, z: dirNormZ })
+    // Try depth grid first (real scene geometry captured at screenshot time),
+    // fall back to room AABB intersection estimate
+    const nx = ((x1 + x2) / 2) / width
+    const ny = ((y1 + y2) / 2) / height
+    const gridDepth = this.interpolateDepthFromGrid(nx, ny)
+    const roomDepth = this.estimateDepthFromRooms(pose.position, { x: dirNormX, y: dirNormY, z: dirNormZ })
+    const depth = gridDepth ?? roomDepth
+    console.debug("[projectBbox] ndc:", { ndcX, ndcY }, "dir:", { x: dirNormX, y: dirNormY, z: dirNormZ },
+      "gridDepth:", gridDepth, "roomDepth:", roomDepth, "depth:", depth,
+      "pose:", { pos: pose.position, rot: pose.rotation })
 
     return {
       x: pose.position.x + dirNormX * depth,
@@ -1438,19 +1598,21 @@ export class MatterportBridge {
     }
   }
 
-  /** Dim all SDK tags except the given one (for focused editing). */
+  /** Hide all SDK tags except the given one (for focused editing). */
   async focusTag(activeTagId: string | null): Promise<void> {
-    for (const [annId, tagId] of this.annotationToTagId.entries()) {
+    if (!this.sdk) return
+    for (const [, tagId] of this.annotationToTagId.entries()) {
       if (activeTagId && tagId !== activeTagId) {
-        void this.editTagOpacity(tagId, 0.15)
+        void this.editTagOpacity(tagId, 0.0)
       } else {
         void this.editTagOpacity(tagId, 1.0)
       }
     }
   }
 
-  /** Restore all tags to full opacity. */
+  /** Restore all tags to full opacity and visibility. */
   async unfocusAllTags(): Promise<void> {
+    if (!this.sdk) return
     for (const tagId of this.annotationToTagId.values()) {
       void this.editTagOpacity(tagId, 1.0)
     }
@@ -1467,12 +1629,41 @@ export class MatterportBridge {
     }
 
     try {
-      await this.sdk.Mattertag.navigateToTag(tagId)
+      // Find the tag's anchor position and navigate to the nearest sweep
+      const tag = this._tags.find((t) => t.id === tagId)
+      if (tag) {
+        const nearest = this.findNearestSweep(tag.anchorPosition)
+        if (nearest) {
+          await this.sdk.Sweep.moveTo(nearest.sid, {
+            transitionTime: 1200,
+          })
+          return true
+        }
+      }
+      // Fallback: try opening the tag (which may also navigate)
+      await this.sdk.Tag.open(tagId)
       return true
     } catch (error) {
       console.error("navigateToTag failed:", error)
       return false
     }
+  }
+
+  private findNearestSweep(pos: Vector3): SweepData | null {
+    let best: SweepData | null = null
+    let bestDist = Infinity
+    for (const sweep of this._sweeps) {
+      if (!sweep.enabled) continue
+      const dx = sweep.position.x - pos.x
+      const dy = sweep.position.y - pos.y
+      const dz = sweep.position.z - pos.z
+      const dist = dx * dx + dy * dy + dz * dz
+      if (dist < bestDist) {
+        bestDist = dist
+        best = sweep
+      }
+    }
+    return best
   }
 
   async openTag(tagId: string): Promise<boolean> {
@@ -1512,13 +1703,49 @@ export class MatterportBridge {
       return false
     }
 
-    try {
-      await this.sdk.Tour.step(index)
-      return true
-    } catch (error) {
-      console.error("stepTour failed:", error)
-      return false
+    // Use predefined tour if snapshots are loaded
+    if (this._tourSnapshots.length > 0) {
+      // SDK Tour.step() requires the tour to be started first —
+      // otherwise the SDK may switch to dollhouse mode or silently fail.
+      if (!this._sdkTourStarted) {
+        try {
+          await this.sdk.Tour.start(index)
+          this._sdkTourStarted = true
+          return true
+        } catch {
+          // Tour.start() failed — fall through to sweep-based navigation
+        }
+      } else {
+        try {
+          await this.sdk.Tour.step(index)
+          return true
+        } catch (error) {
+          console.error("stepTour failed:", error)
+          // Fall through to sweep-based navigation
+        }
+      }
     }
+
+    // Fallback: navigate to sweep positions directly
+    const sweeps = this.getSweepsForTour()
+    const sweep = sweeps[index]
+    if (!sweep) return false
+    return this.navigateToSweep(sweep.sid, { transition: "fly" })
+  }
+
+  /**
+   * Returns a curated list of enabled sweeps suitable for an auto-tour.
+   * If the model has predefined tour snapshots, those should be preferred.
+   * This is the sweep-based fallback used when Tour.getData() returns [].
+   */
+  getSweepsForTour(maxStops = 20): SweepData[] {
+    const enabled = this._sweeps.filter((s) => s.enabled)
+    if (enabled.length === 0) return []
+    if (enabled.length <= maxStops) return [...enabled]
+
+    // Sample evenly so the tour covers the whole space systematically
+    const step = Math.floor(enabled.length / maxStops)
+    return enabled.filter((_, i) => i % step === 0).slice(0, maxStops)
   }
 
   // -----------------------------------------------------------------------
@@ -1679,9 +1906,14 @@ export class MatterportBridge {
       return
     }
 
-    // Camera pose
+    // Camera pose — deep-copy position/rotation to prevent SDK from
+    // mutating our stored pose when the camera moves later.
     const poseSub = sdk.Camera.pose.subscribe((pose: CameraPose) => {
-      this._lastPose = { ...pose }
+      this._lastPose = {
+        ...pose,
+        position: { ...pose.position },
+        rotation: { ...pose.rotation },
+      }
     })
     this.subscriptions = [...this.subscriptions, poseSub]
 
@@ -1793,8 +2025,14 @@ export class MatterportBridge {
     if (sdk.Pointer) {
       const pointerSub = sdk.Pointer.intersection.subscribe(
         (intersection: PointerIntersection) => {
+          // Deep-copy position/normal so SDK can't mutate our stored values
+          const snapshot = {
+            ...intersection,
+            position: { ...intersection.position },
+            normal: { ...intersection.normal },
+          }
           for (const cb of this.pointerCallbacks) {
-            cb({ ...intersection })
+            cb(snapshot)
           }
         }
       )
@@ -1821,16 +2059,20 @@ export class MatterportBridge {
     this.subscriptions = [...this.subscriptions, sweepSub]
 
     // Load rooms via collection observable — SDK rooms use `label`, map to our `name`
+    // Guard: only update if the new collection is non-empty to prevent clearing
+    // on interim empty-collection events that the SDK sometimes emits.
     const roomSub = sdk.Room.data.subscribe({
       onCollectionUpdated: (collection) => {
         const sdkRooms: SdkRoomData[] = collection instanceof Map
           ? Array.from(collection.values())
           : [...collection]
-        this._rooms = sdkRooms.map((r) => ({
-          id: r.id,
-          name: r.label ?? r.id,
-          bounds: r.bounds,
-        }))
+        if (sdkRooms.length > 0) {
+          this._rooms = sdkRooms.map((r) => ({
+            id: r.id,
+            name: r.label ?? r.id,
+            bounds: r.bounds,
+          }))
+        }
       },
     })
     this.subscriptions = [...this.subscriptions, roomSub]
